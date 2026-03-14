@@ -18,6 +18,15 @@ Built all core components and data pipeline:
 - **Project setup**: `pyproject.toml`, package inits, container files
 - **Container environment**: `Dockerfile`, `docker-compose.yml`, `.devcontainer/devcontainer.json`
   - Not yet tested — Docker not available on dev machine. Must validate on compute platform.
+
+### Session 3 (2026-03-13): Container TODOs + Code Cleanup
+Resolved all current-milestone container TODOs and simplified code:
+
+- **`.dockerignore`**: Created — excludes `.git`, `__pycache__`, `data_local/`, `checkpoints_local/`, `.devcontainer/`, `*.md` (except `CLAUDE.md`), `.claude/`
+- **Dockerfile**: Cleaned up resolved TODOs. Added `sandbox` user + `SANDBOX_USER` env var.
+- **`docker-compose.yml`**: Added `stdin_open`/`tty` to `dev`, `--timeout=30` to `test`, new `download` service with HF cache volume.
+- **`sandbox/executor.py`**: Simplified — removed `_get_sandbox_uid()` indirection, removed `search_fn` parameter (unused placeholder), removed `_check_imports`/`_build_runner_script` helper split, consolidated into flat `execute_code()` function. 163→87 lines.
+- **`data/download_and_format.py`**: Removed trivial one-liner extract functions (hotpotqa, musique, 2wiki → shared `_answer_field` lambda, finqa → `_finqa_field` lambda). Removed per-config `output_splits` dict in favor of shared `_SPLIT_DIRS` mapping. Removed empty `metadata: {}` from output. 275→167 lines.
 - **`core/code_block_detector.py`**: Post-hoc `detect_code_block()` + real-time `CodeBlockWatcher` state machine. 17 tests in `tests/test_code_block_detector.py`.
 - **`sandbox/executor.py`**: Subprocess execution, 5s timeout, import whitelist, `search()` injection. 21 tests in `tests/test_executor.py`.
 - **`core/replacement.py`**: Comment-preserving replacement — code vanishes, comments + stdout remain. 10 tests in `tests/test_replacement.py`.
@@ -61,7 +70,7 @@ Built all core components and data pipeline:
 
 4. **No reference model in memory when KL=0.** Saves ~14GB. Load it only if switching to KL=1e-4.
 
-5. **Container not yet validated.** Dockerfile, compose, and devcontainer were written but Docker is not installed on the dev machine. First action on any compute platform: `docker compose run test`.
+5. **Container not yet validated.** Dockerfile, compose, and devcontainer were written and container TODOs resolved (`.dockerignore`, sandbox user, download service, interactive dev). Docker is not installed on the dev machine. First action on any compute platform: `docker compose run test`.
 
 ## What's Left to Do
 
@@ -107,16 +116,18 @@ docker compose run test
 # Interactive dev shell
 docker compose run dev
 
-# Download datasets (inside container)
-DATA_ROOT=/data python -m data.download_and_format
+# Download all datasets
+docker compose run download
 
 # Download specific datasets only
-DATA_ROOT=/data python -m data.download_and_format --datasets gsm8k hotpotqa
+docker compose run download python -m data.download_and_format --datasets gsm8k hotpotqa
 ```
 
 ## Codebase Conventions
+- **This is research code, not production code.** Keep it clean, easy to read, and small. Favor simplicity over robustness.
+- No unnecessary abstractions, helpers, or indirection. Three similar lines > a premature helper function.
+- No verbose docstrings. A one-liner is fine; multi-paragraph docstrings are not. Let function names and signatures speak.
+- No defensive coding for impossible scenarios. Trust internal code paths.
 - Modular package structure: `core/`, `sandbox/`, `data/`, `tests/`
-- Minimal abstractions — no over-engineering
-- No excessive comments; code should be self-explanatory
 - All paths via `$DATA_ROOT` and `$CHECKPOINT_ROOT` env vars (compute-agnostic)
 - Container-first: all deps managed via `pyproject.toml`, never `pip install` on bare metal

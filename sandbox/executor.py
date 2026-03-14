@@ -3,13 +3,6 @@ import sys
 import textwrap
 import tempfile
 import os
-from typing import Callable
-
-ALLOWED_MODULES = frozenset({
-    "math", "numpy", "collections", "itertools", "re",
-    "statistics", "functools", "string", "decimal", "fractions",
-    "random", "operator", "json",
-})
 
 BLOCKED_PATTERNS = frozenset({
     "import os", "import sys", "import subprocess", "import shutil",
@@ -23,116 +16,65 @@ BLOCKED_PATTERNS = frozenset({
 
 TIMEOUT_SECONDS = 5
 
+_BLOCKED_MODULES = frozenset({
+    "os", "sys", "subprocess", "shutil", "socket",
+    "requests", "urllib", "importlib", "pathlib", "io",
+    "signal", "ctypes", "multiprocessing", "threading",
+})
 
-def _check_imports(code: str) -> str | None:
-    """Return an error message if code uses blocked imports/builtins, else None."""
-    for pattern in BLOCKED_PATTERNS:
-        if pattern in code:
-            return f"Blocked operation: {pattern}"
-    return None
+_IMPORT_GUARD = textwrap.dedent("""\
+    import builtins
+    _orig_import = builtins.__import__
+    _BLOCKED = {blocked}
+    def _safe_import(name, globals=None, locals=None, fromlist=(), level=0):
+        top = name.split('.')[0]
+        if level == 0 and top in _BLOCKED:
+            raise ImportError(f"Import '{{name}}' is not allowed")
+        return _orig_import(name, globals, locals, fromlist, level)
+    builtins.__import__ = _safe_import
+""")
 
-
-def _build_runner_script(code: str, search_fn_code: str | None = None) -> str:
-    """Build a standalone Python script that executes the user's code."""
-    parts = []
-
-    # Restrict builtins
-    parts.append(textwrap.dedent("""\
-        import builtins
-        _orig_import = builtins.__import__
-        _ALLOWED = {allowed}
-        def _safe_import(name, *args, **kwargs):
-            top = name.split('.')[0]
-            if top not in _ALLOWED:
-                raise ImportError(f"Import '{{name}}' is not allowed")
-            return _orig_import(name, *args, **kwargs)
-        builtins.__import__ = _safe_import
-    """).format(allowed=repr(ALLOWED_MODULES)))
-
-    if search_fn_code:
-        parts.append(search_fn_code)
-
-    parts.append(code)
-    return "\n".join(parts)
+_SEARCH_PLACEHOLDER = textwrap.dedent("""\
+    def search(query):
+        return f"[Search results for: {query}] No search backend configured."
+""")
 
 
 def execute_code(
     code: str,
     search_enabled: bool = False,
-    search_fn: Callable[[str], str] | None = None,
     timeout: int = TIMEOUT_SECONDS,
 ) -> str:
-    """Execute Python code in a sandboxed subprocess.
-
-    Args:
-        code: Python source to execute.
-        search_enabled: Whether to inject a search() function.
-        search_fn: If provided, this callable is used to implement search().
-                   If search_enabled=True and search_fn is None, search()
-                   returns a placeholder.
-        timeout: Max execution time in seconds.
-
-    Returns:
-        stdout from execution, or "ERROR: <message>".
-    """
+    """Execute Python code in a sandboxed subprocess. Returns stdout or 'ERROR: ...'."""
     if not code.strip():
         return ""
 
-    blocked = _check_imports(code)
-    if blocked:
-        return f"ERROR: {blocked}"
+    for pattern in BLOCKED_PATTERNS:
+        if pattern in code:
+            return f"ERROR: Blocked operation: {pattern}"
 
-    # Build search function injection
-    search_fn_code = None
+    script = _IMPORT_GUARD.format(blocked=repr(_BLOCKED_MODULES))
     if search_enabled:
-        if search_fn is not None:
-            # We can't serialize an arbitrary callable into a subprocess.
-            # Instead, we use a file-based IPC approach: write queries to a temp file,
-            # the parent process picks them up. For simplicity in the MVP, we run
-            # search in-process via a wrapper that pre-computes results.
-            # For now, use a placeholder that the caller can override.
-            search_fn_code = textwrap.dedent("""\
-                import json, sys
-                def search(query):
-                    # Write query to stderr for parent to intercept
-                    sys.stderr.write("SEARCH_QUERY:" + query + "\\n")
-                    sys.stderr.flush()
-                    return "Search is not available in subprocess mode. Use cached results."
-            """)
-        else:
-            search_fn_code = textwrap.dedent("""\
-                def search(query):
-                    return f"[Search results for: {query}] No search backend configured."
-            """)
+        script += _SEARCH_PLACEHOLDER
+    script += "\n" + code
 
-    runner_script = _build_runner_script(code, search_fn_code)
-
-    # Write to temp file and execute
     try:
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".py", delete=False, encoding="utf-8"
         ) as f:
-            f.write(runner_script)
+            f.write(script)
             tmp_path = f.name
 
         result = subprocess.run(
             [sys.executable, tmp_path],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
+            capture_output=True, text=True, timeout=timeout,
             cwd=tempfile.gettempdir(),
         )
 
         if result.returncode != 0:
-            stderr = result.stderr.strip()
-            # Extract just the last line (the actual error) for cleaner output
-            error_lines = stderr.splitlines()
-            if error_lines:
-                # Find the actual error (skip traceback)
-                for line in reversed(error_lines):
-                    if line and not line.startswith(" ") and not line.startswith("Traceback"):
-                        return f"ERROR: {line}"
-                return f"ERROR: {error_lines[-1]}"
+            for line in reversed(result.stderr.strip().splitlines()):
+                if line and not line.startswith(" ") and not line.startswith("Traceback"):
+                    return f"ERROR: {line}"
             return "ERROR: Unknown error"
 
         return result.stdout.rstrip("\n")

@@ -1,0 +1,12 @@
+.git
+__pycache__
+*.pyc
+*.pyo
+data_local/
+checkpoints_local/
+.devcontainer/
+.vscode/
+*.md
+!CLAUDE.md
+.claude/
+.gitignore

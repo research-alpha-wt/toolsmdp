@@ -117,7 +117,7 @@ class TestExtractFinQA:
 
     def test_negative_number(self):
         text = "The change was -3.2%"
-        assert extract_answer(text, "finqa") == "3.2"
+        assert extract_answer(text, "finqa") == "-3.2"
 
     def test_large_number(self):
         text = "Revenue was 1,234,567"

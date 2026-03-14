@@ -24,5 +24,8 @@ dev = [
     "pytest-timeout",
 ]
 
+[tool.setuptools.packages.find]
+include = ["core*", "sandbox*", "data*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

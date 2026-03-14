@@ -73,10 +73,10 @@ class CodeBlockWatcher:
         self._fence_buffer = ""
 
     def feed_token(self, token_text: str) -> str:
-        if self.eos_token in token_text:
-            return "eos"
-
         self.buffer += token_text
+
+        if self.eos_token in self.buffer:
+            return "eos"
 
         if self.state == "NORMAL":
             if self._check_opening_fence():

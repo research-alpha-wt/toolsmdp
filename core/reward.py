@@ -109,7 +109,7 @@ def _extract_qa_answer(text: str) -> str | None:
 
 def _extract_last_number(text: str) -> str | None:
     """Extract the last number from text."""
-    matches = re.findall(r"-?[\d,]+\.?\d*", text)
+    matches = re.findall(r"-?[\d,]+(?:\.\d+)?", text)
     if matches:
         return matches[-1].replace(",", "")
     return None
