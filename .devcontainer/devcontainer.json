@@ -1,0 +1,28 @@
+{
+  "name": "ToolSMDP Dev",
+  "build": {
+    "context": "..",
+    "dockerfile": "../Dockerfile"
+  },
+  "workspaceFolder": "/workspace",
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/workspace,type=bind"
+  ],
+  "postCreateCommand": "pip install -e '.[dev]'",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance"
+      ],
+      "settings": {
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["tests/"]
+      }
+    }
+  },
+  "containerEnv": {
+    "DATA_ROOT": "/data",
+    "CHECKPOINT_ROOT": "/checkpoints"
+  }
+}

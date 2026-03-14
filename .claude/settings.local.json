@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"C:\\\\Users\\\\abhijitkumar\\\\Research\\\\toolsmdp\" && python -m pytest tests/test_code_block_detector.py -v 2>&1)",
+      "Bash(ls \"C:\\\\Users\\\\abhijitkumar\\\\Research\\\\toolsmdp/.devcontainer\" 2>/dev/null; echo \"exit: $?\")",
+      "Bash(cd \"C:\\\\Users\\\\abhijitkumar\\\\Research\\\\toolsmdp\" && docker compose build test 2>&1)",
+      "Bash(python --version 2>&1; pip --version 2>&1; where python 2>/dev/null; where pip 2>/dev/null)",
+      "Bash(where uv:*)"
+    ]
+  }
+}

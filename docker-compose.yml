@@ -1,0 +1,54 @@
+# TODO: Add a `train` service with GPU support once we reach Milestone 4.
+#       Requires nvidia-container-toolkit on the host and a CUDA base image.
+#       Example:
+#       train:
+#         build:
+#           context: .
+#           dockerfile: Dockerfile.gpu
+#         deploy:
+#           resources:
+#             reservations:
+#               devices:
+#                 - capabilities: [gpu]
+#         volumes:
+#           - .:/workspace
+#           - ${DATA_ROOT:-./data_local}:/data
+#           - ${CHECKPOINT_ROOT:-./checkpoints_local}:/checkpoints
+#         environment:
+#           - DATA_ROOT=/data
+#           - CHECKPOINT_ROOT=/checkpoints
+#           - WANDB_API_KEY=${WANDB_API_KEY}
+
+# TODO: Add a `download` service that runs data/download_and_format.py with
+#       HuggingFace cache mounted to avoid re-downloading across rebuilds.
+#       download:
+#         build: .
+#         volumes:
+#           - ${DATA_ROOT:-./data_local}:/data
+#           - hf_cache:/root/.cache/huggingface
+#         environment:
+#           - DATA_ROOT=/data
+#         command: python -m data.download_and_format
+
+services:
+  dev:
+    build: .
+    volumes:
+      - .:/workspace
+      - ${DATA_ROOT:-./data_local}:/data
+      - ${CHECKPOINT_ROOT:-./checkpoints_local}:/checkpoints
+    environment:
+      - DATA_ROOT=/data
+      - CHECKPOINT_ROOT=/checkpoints
+    command: bash
+    # TODO: Add stdin_open: true and tty: true for interactive shell:
+    #   stdin_open: true
+    #   tty: true
+
+  test:
+    build: .
+    volumes:
+      - .:/workspace
+    command: pytest tests/ -v
+    # TODO: Add timeout to prevent hanging tests from blocking CI:
+    #   command: pytest tests/ -v --timeout=30

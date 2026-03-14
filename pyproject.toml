@@ -1,0 +1,28 @@
+[project]
+name = "toolsmdp"
+version = "0.1.0"
+description = "Segment-level RL for LLM tool use via the SMDP framework"
+requires-python = ">=3.10"
+dependencies = [
+    "datasets",
+    "transformers",
+    "tokenizers",
+    "pandas",
+    "jsonlines",
+    "tqdm",
+    "numpy",
+]
+
+[project.optional-dependencies]
+train = [
+    "torch",
+    "vllm",
+    "wandb",
+]
+dev = [
+    "pytest",
+    "pytest-timeout",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
