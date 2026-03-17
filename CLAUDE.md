@@ -17,7 +17,6 @@ Built all core components and data pipeline:
 
 - **Project setup**: `pyproject.toml`, package inits, container files
 - **Container environment**: `Dockerfile`, `docker-compose.yml`, `.devcontainer/devcontainer.json`
-  - Not yet tested — Docker not available on dev machine. Must validate on compute platform.
 
 ### Session 3 (2026-03-13): Container TODOs + Code Cleanup
 Resolved all current-milestone container TODOs and simplified code:
@@ -45,6 +44,16 @@ Resolved all current-milestone container TODOs and simplified code:
 - **Dockerfile**: split dep install (non-editable) from source install (editable) for layer caching
 - **VS Code Dev Container**: working — "Reopen in Container" connects to Linux container with full debugging
 - **`.vscode/launch.json`**: added "Debug Tests" and "Debug Current Test File" configurations
+- **Sample data downloaded** (50 examples each): `gsm8k_train_50`, `gsm8k_test_50`, `hotpotqa_dev_50`, `finqa_train_50`, `finqa_test_50`
+
+### Session 5 (2026-03-17): Inference Script + Compute Planning
+- **`scripts/test_base_model.py`**: Three-mode inference script for Qwen3.5-4B:
+  - `code_gen`: Smoke test — does the model produce ```python blocks?
+  - `pipeline`: Full SMDP segment loop (generate → detect → execute → replace → continue)
+  - `eval`: Run on JSONL data, compute EM accuracy + difficulty bucket classification
+- **Model choice**: Qwen3.5-4B (`Qwen/Qwen3.5-4B`), ~10GB VRAM BF16, 256K context
+- **Auto dtype**: float16 on T4 (no native bfloat16), bfloat16 on A100/H200
+- **Compute plan**: Lightning.ai T4 (79h free) for Milestones 2-3, save A100/H200 for training
 
 ## Key Decisions and Why
 
@@ -86,9 +95,11 @@ Resolved all current-milestone container TODOs and simplified code:
 
 ### Immediate (next session)
 - [x] Get Docker running and validate container build + test suite
-- [ ] Run `data/download_and_format.py` on compute platform to download datasets
-- [ ] Verify answer extraction on 10 examples per dataset (script prints these)
-- [ ] `scripts/test_base_model_code_generation.py` — verify Qwen generates code blocks
+- [x] Download sample datasets (50 examples each for gsm8k, hotpotqa, finqa)
+- [x] `scripts/test_base_model.py` — inference script written, needs GPU to run
+- [ ] Set up Lightning.ai Studio (T4, 79h free)
+- [ ] Run `--mode code_gen` to verify Qwen3.5-4B generates code blocks
+- [ ] Run `--mode eval` on 50-sample files to validate full pipeline
 
 ### Milestone 2: Pre-Training Analysis
 - [ ] Run base model with tools on eval sets (500 samples per dataset)
@@ -120,23 +131,28 @@ Resolved all current-milestone container TODOs and simplified code:
 ## How to Run
 
 ```bash
-# Run tests
+# Run tests (local with Docker)
 docker compose run test
 
 # Interactive dev shell
 docker compose run dev
 
-# Download all datasets (full)
-docker compose run download
-
-# Download specific datasets
-docker compose run download python -m data.download_and_format --datasets gsm8k hotpotqa finqa
-
-# Download just HotpotQA dev, 50 examples for inspection
-docker compose run download python -m data.download_and_format --datasets hotpotqa --splits dev --max-samples 50
+# Download datasets
+docker compose run download python -m data.download_and_format --datasets gsm8k hotpotqa finqa --max-samples 50
 
 # Download with cap (500 per split)
 docker compose run download python -m data.download_and_format --datasets hotpotqa --max-samples 500
+
+# Base model inference (requires GPU — run on Lightning.ai or similar)
+python -m scripts.test_base_model --mode code_gen              # smoke test
+python -m scripts.test_base_model --mode pipeline              # full SMDP loop
+python -m scripts.test_base_model --mode eval --data data_local/eval_splits/gsm8k_test_50.jsonl
+python -m scripts.test_base_model --mode eval --data data_local/eval_splits/hotpotqa_dev_50.jsonl --num-rollouts 4
+
+# Lightning.ai setup (no Docker needed)
+git clone <repo> && cd toolsmdp
+pip install -e ".[train,dev]"
+pytest tests/ -v
 ```
 
 ## Codebase Conventions
