@@ -34,7 +34,17 @@ Resolved all current-milestone container TODOs and simplified code:
 - **`core/segment_rollout.py`**: `Segment` and `Trajectory` dataclasses (training-loop bookkeeping only — model never sees these).
 - **`data/download_and_format.py`**: Downloads 8 datasets from HuggingFace, converts to unified JSONL. Not yet run (needs HF access on compute platform).
 
-**Tests not yet run** — all written, awaiting container build. Run with `docker compose run test`.
+### Session 4 (2026-03-16): Container Validation + Bug Fixes
+- **Container validated**: Docker build + `docker compose run test` working on dev machine.
+- **100/100 tests passing** after fixing 5 bugs found during first run:
+  - `CodeBlockWatcher` EOS detection: check buffer instead of just current token (char-by-char feeding)
+  - `executor.py` import guard: switched from allowlist to blocklist — stdlib internal deps (`codecs`, `decoder`, `_io`) were blocked
+  - `reward.py` `_extract_last_number` regex: `\.?\d*` → `(?:\.\d+)?` to avoid matching trailing dots (`42.`)
+  - FinQA test expectation: `-3.2` is correct, not `3.2`
+- **pyproject.toml**: added `[tool.setuptools.packages.find]` to fix editable install
+- **Dockerfile**: split dep install (non-editable) from source install (editable) for layer caching
+- **VS Code Dev Container**: working — "Reopen in Container" connects to Linux container with full debugging
+- **`.vscode/launch.json`**: added "Debug Tests" and "Debug Current Test File" configurations
 
 ## Key Decisions and Why
 
@@ -70,12 +80,12 @@ Resolved all current-milestone container TODOs and simplified code:
 
 4. **No reference model in memory when KL=0.** Saves ~14GB. Load it only if switching to KL=1e-4.
 
-5. **Container not yet validated.** Dockerfile, compose, and devcontainer were written and container TODOs resolved (`.dockerignore`, sandbox user, download service, interactive dev). Docker is not installed on the dev machine. First action on any compute platform: `docker compose run test`.
+5. **Container validated on dev machine (Session 4).** 100/100 tests passing. Use VS Code Dev Containers for visual debugging, or `docker compose run test` from CLI.
 
 ## What's Left to Do
 
 ### Immediate (next session)
-- [ ] Get Docker running and validate container build + test suite
+- [x] Get Docker running and validate container build + test suite
 - [ ] Run `data/download_and_format.py` on compute platform to download datasets
 - [ ] Verify answer extraction on 10 examples per dataset (script prints these)
 - [ ] `scripts/test_base_model_code_generation.py` — verify Qwen generates code blocks
@@ -116,11 +126,17 @@ docker compose run test
 # Interactive dev shell
 docker compose run dev
 
-# Download all datasets
+# Download all datasets (full)
 docker compose run download
 
-# Download specific datasets only
-docker compose run download python -m data.download_and_format --datasets gsm8k hotpotqa
+# Download specific datasets
+docker compose run download python -m data.download_and_format --datasets gsm8k hotpotqa finqa
+
+# Download just HotpotQA dev, 50 examples for inspection
+docker compose run download python -m data.download_and_format --datasets hotpotqa --splits dev --max-samples 50
+
+# Download with cap (500 per split)
+docker compose run download python -m data.download_and_format --datasets hotpotqa --max-samples 500
 ```
 
 ## Codebase Conventions

@@ -1,12 +1,17 @@
 """Download datasets from HuggingFace and convert to unified JSONL format.
 
-Usage: python -m data.download_and_format [--data-root /path] [--datasets gsm8k hotpotqa]
+Usage:
+    python -m data.download_and_format                                  # all datasets, all splits
+    python -m data.download_and_format --datasets hotpotqa --max-samples 100  # 100 examples per split
+    python -m data.download_and_format --datasets gsm8k hotpotqa finqa  # milestone 2 minimum
+    python -m data.download_and_format --datasets hotpotqa --splits dev --max-samples 50  # inspection
 """
 
 import argparse
 import json
 import os
 import re
+import urllib.request
 from pathlib import Path
 
 from datasets import load_dataset
@@ -98,8 +103,12 @@ DATASET_CONFIGS = {
         "splits": {"train": "train", "validation": "dev"},
     },
     "finqa": {
-        "hf_path": "ibm/finqa", "hf_name": None,
-        "extract_fn": _finqa_field, "question_key": "question",
+        "github_urls": {
+            "train": "https://raw.githubusercontent.com/czyssrs/FinQA/main/dataset/train.json",
+            "test": "https://raw.githubusercontent.com/czyssrs/FinQA/main/dataset/test.json",
+        },
+        "extract_fn": lambda ex: str(ex["qa"]["exe_ans"]),
+        "question_key": "qa.question",
         "splits": {"train": "train", "test": "test"},
     },
     "triviaqa": {
@@ -113,16 +122,33 @@ DATASET_CONFIGS = {
 _SPLIT_DIRS = {"train": "processed", "dev": "eval_splits", "test": "eval_splits"}
 
 
-def process_dataset(name: str, config: dict, data_root: Path, verify_n: int = 10):
+def _get_field(ex, key):
+    """Get a field, supporting dotted keys like 'qa.question'."""
+    for part in key.split("."):
+        ex = ex[part]
+    return ex
+
+
+def _load_github_json(url):
+    """Download a JSON file from GitHub and return as list of dicts."""
+    print(f"  Downloading from GitHub...")
+    data = json.loads(urllib.request.urlopen(url).read())
+    return data
+
+
+def process_dataset(name: str, config: dict, data_root: Path,
+                    max_samples: int = 0, splits_filter: list[str] | None = None,
+                    verify_n: int = 10):
     print(f"\n{'='*60}\nProcessing: {name}\n{'='*60}")
 
-    hf_kwargs = {"path": config["hf_path"]}
-    if config.get("hf_name"):
-        hf_kwargs["name"] = config["hf_name"]
-
     for hf_split, our_split in config["splits"].items():
+        if splits_filter and our_split not in splits_filter:
+            print(f"  {our_split}: skipped (not in --splits)")
+            continue
+
+        suffix = f"_{max_samples}" if max_samples else ""
         output_dir = _SPLIT_DIRS[our_split]
-        output_path = data_root / output_dir / f"{name}_{our_split}.jsonl"
+        output_path = data_root / output_dir / f"{name}_{our_split}{suffix}.jsonl"
 
         if output_path.exists():
             n_lines = sum(1 for _ in open(output_path))
@@ -131,18 +157,29 @@ def process_dataset(name: str, config: dict, data_root: Path, verify_n: int = 10
 
         print(f"  Loading {hf_split} split...")
         try:
-            ds = load_dataset(**hf_kwargs, split=hf_split, trust_remote_code=True)
+            if "github_urls" in config:
+                raw_data = _load_github_json(config["github_urls"][hf_split])
+                if max_samples and len(raw_data) > max_samples:
+                    raw_data = raw_data[:max_samples]
+            else:
+                hf_kwargs = {"path": config["hf_path"]}
+                if config.get("hf_name"):
+                    hf_kwargs["name"] = config["hf_name"]
+                ds = load_dataset(**hf_kwargs, split=hf_split, trust_remote_code=True)
+                if max_samples and len(ds) > max_samples:
+                    ds = ds.select(range(max_samples))
+                raw_data = ds
         except Exception as e:
             print(f"  ERROR loading {name}/{hf_split}: {e}")
             continue
 
-        print(f"  Converting {len(ds)} examples...")
+        print(f"  Converting {len(raw_data)} examples...")
         examples, errors = [], 0
 
-        for ex in tqdm(ds, desc=f"  {name}/{our_split}"):
+        for ex in tqdm(raw_data, desc=f"  {name}/{our_split}"):
             try:
                 examples.append({
-                    "question": ex[config["question_key"]],
+                    "question": _get_field(ex, config["question_key"]),
                     "gold_answer": config["extract_fn"](ex),
                     "dataset": name,
                     "split": our_split,
@@ -166,10 +203,22 @@ def process_dataset(name: str, config: dict, data_root: Path, verify_n: int = 10
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Download and format datasets")
+    parser = argparse.ArgumentParser(
+        description="Download and format datasets",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""examples:
+  python -m data.download_and_format --datasets hotpotqa --splits dev --max-samples 50
+  python -m data.download_and_format --datasets gsm8k hotpotqa finqa
+  python -m data.download_and_format --datasets hotpotqa --max-samples 500""")
     parser.add_argument("--data-root", type=str, default=None)
-    parser.add_argument("--datasets", nargs="*", default=None)
-    parser.add_argument("--verify", type=int, default=10)
+    parser.add_argument("--datasets", nargs="*", default=None,
+                        help="datasets to download (default: all)")
+    parser.add_argument("--splits", nargs="*", default=None,
+                        help="only download these splits: train, dev, test (default: all)")
+    parser.add_argument("--max-samples", type=int, default=0,
+                        help="cap examples per split (0 = no cap)")
+    parser.add_argument("--verify", type=int, default=10,
+                        help="examples to print for inspection")
     args = parser.parse_args()
 
     if args.data_root:
@@ -177,20 +226,28 @@ def main():
 
     data_root = get_data_root()
     print(f"Data root: {data_root}")
+    if args.max_samples:
+        print(f"Max samples per split: {args.max_samples}")
+    if args.splits:
+        print(f"Splits filter: {args.splits}")
 
     for name in (args.datasets or list(DATASET_CONFIGS.keys())):
         if name not in DATASET_CONFIGS:
             print(f"Unknown dataset: {name}")
             continue
-        process_dataset(name, DATASET_CONFIGS[name], data_root, args.verify)
+        process_dataset(name, DATASET_CONFIGS[name], data_root,
+                        max_samples=args.max_samples,
+                        splits_filter=args.splits,
+                        verify_n=args.verify)
 
     print(f"\n{'='*60}\nDone! Summary:")
     for subdir in ["processed", "eval_splits"]:
         path = data_root / subdir
         files = sorted(path.glob("*.jsonl"))
-        print(f"\n  {subdir}/")
-        for f in files:
-            print(f"    {f.name}: {sum(1 for _ in open(f))} examples")
+        if files:
+            print(f"\n  {subdir}/")
+            for f in files:
+                print(f"    {f.name}: {sum(1 for _ in open(f))} examples")
 
 
 if __name__ == "__main__":

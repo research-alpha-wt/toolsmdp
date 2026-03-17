@@ -42,6 +42,7 @@ services:
   download:
     build: .
     volumes:
+      - .:/workspace
       - ${DATA_ROOT:-./data_local}:/data
       - hf_cache:/root/.cache/huggingface
     environment:
