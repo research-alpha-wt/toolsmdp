@@ -30,13 +30,18 @@ def normalize_number(text: str) -> str | None:
 def extract_answer(text: str, dataset: str) -> str | None:
     """Extract the final answer from generated text, dataset-aware.
 
-    Each dataset has conventions for how the model should present its answer.
-    We look for common patterns in reverse order of specificity.
+    Checks for <answer>...</answer> tag first (universal), then falls back
+    to dataset-specific patterns.
     """
     if not text:
         return None
 
-    # Try dataset-specific patterns first
+    # Universal: <answer>...</answer> tag
+    match = re.search(r"<answer>(.*?)</answer>", text, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+
+    # Fall back to dataset-specific patterns
     if dataset in ("gsm8k",):
         return _extract_gsm8k(text)
     elif dataset in ("math",):
@@ -45,7 +50,6 @@ def extract_answer(text: str, dataset: str) -> str | None:
         return _extract_finqa(text)
 
     # For QA datasets (hotpotqa, nq, musique, 2wiki, triviaqa):
-    # Look for common answer patterns
     return _extract_qa_answer(text)
 
 

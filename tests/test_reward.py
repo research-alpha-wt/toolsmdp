@@ -34,6 +34,33 @@ class TestNormalization:
         assert normalize_number("hello") is None
 
 
+class TestExtractAnswerTag:
+
+    def test_answer_tag_gsm8k(self):
+        text = "Some reasoning...\n<answer>42</answer>"
+        assert extract_answer(text, "gsm8k") == "42"
+
+    def test_answer_tag_hotpotqa(self):
+        text = "Looking it up...\n<answer>Paris</answer>"
+        assert extract_answer(text, "hotpotqa") == "Paris"
+
+    def test_answer_tag_with_whitespace(self):
+        text = "<answer>  spaced answer  </answer>"
+        assert extract_answer(text, "hotpotqa") == "spaced answer"
+
+    def test_answer_tag_takes_priority(self):
+        text = "The answer is 99.\n#### 99\n<answer>42</answer>"
+        assert extract_answer(text, "gsm8k") == "42"
+
+    def test_answer_tag_multiline(self):
+        text = "<answer>line 1\nline 2</answer>"
+        assert extract_answer(text, "hotpotqa") == "line 1\nline 2"
+
+    def test_no_answer_tag_falls_through(self):
+        text = "Some reasoning...\n#### 42"
+        assert extract_answer(text, "gsm8k") == "42"
+
+
 class TestExtractGSM8K:
 
     def test_hash_pattern(self):

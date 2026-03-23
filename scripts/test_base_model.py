@@ -49,7 +49,8 @@ The code will be executed and you will see the output. You can use this to:
 After seeing tool output, always write the key result in a <context>...</context> block before continuing your reasoning. For example:
 <context>The population of France is approximately 67 million.</context>
 
-When you have the final answer, state it clearly as: "The answer is <answer>."
+When you have the final answer, write it in an answer block:
+<answer>your final answer here</answer>
 """
 
 SEARCH_PROMPT_ADDITION = """
