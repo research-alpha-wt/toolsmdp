@@ -15,7 +15,7 @@ echo ""
 
 # ── 1. Python dependencies ──
 echo "=== [1/7] Installing Python dependencies ==="
-pip install --upgrade transformers accelerate
+pip install "transformers>=4.57,<5" accelerate
 pip install -e ".[train,dev]"
 
 # ── 2. Java for Pyserini ──
