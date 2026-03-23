@@ -13,7 +13,8 @@ class Segment:
     generated_text: str
     generated_ids: list[int] = field(default_factory=list)
     log_probs: list[float] = field(default_factory=list)
-    termination: str = "eos"  # "tool_call" | "eos" | "truncated"
+    segment_type: str = "synthesize"  # "invoke" | "assimilate" | "synthesize"
+    termination: str = "eos"  # "tool_call" | "context_block" | "eos" | "truncated"
     tool_code: str | None = None
     tool_comments: list[str] | None = None
     tool_output: str | None = None
@@ -37,7 +38,11 @@ class Trajectory:
 
     @property
     def total_tool_calls(self) -> int:
-        return sum(1 for s in self.segments if s.termination == "tool_call")
+        return sum(1 for s in self.segments if s.segment_type == "invoke")
+
+    @property
+    def total_assimilations(self) -> int:
+        return sum(1 for s in self.segments if s.segment_type == "assimilate")
 
     @property
     def hit_segment_limit(self) -> bool:

@@ -1,5 +1,5 @@
 from core.code_block_detector import detect_code_block
-from core.replacement import replace_code_block
+from core.replacement import replace_code_block, replace_tool_output_with_context
 
 
 class TestReplaceCodeBlock:
@@ -91,3 +91,40 @@ class TestReplaceCodeBlock:
         det = detect_code_block(text)
         result = replace_code_block(text, det, "result")
         assert result == "result"
+
+
+class TestReplaceToolOutputWithContext:
+
+    def test_basic_replacement(self):
+        text = "Before.\nSearch returned: France GDP is $3.05 trillion.\nAfter."
+        result = replace_tool_output_with_context(
+            text, "Search returned: France GDP is $3.05 trillion.", "France GDP is $3T."
+        )
+        assert "France GDP is $3T." in result
+        assert "Search returned:" not in result
+        assert "Before." in result
+        assert "After." in result
+
+    def test_multiline_tool_output(self):
+        tool_output = "Result 1: Paris\nResult 2: Lyon\nResult 3: Marseille"
+        text = f"I searched.\n{tool_output}\nNow I know."
+        result = replace_tool_output_with_context(text, tool_output, "Capital is Paris.")
+        assert "Capital is Paris." in result
+        assert "Result 1:" not in result
+
+    def test_tool_output_not_found(self):
+        text = "Some text without the tool output."
+        result = replace_tool_output_with_context(text, "nonexistent output", "context")
+        assert result == text
+
+    def test_empty_context_content(self):
+        text = "Before.\nTool output here.\nAfter."
+        result = replace_tool_output_with_context(text, "Tool output here.", "")
+        assert "Tool output here." not in result
+        assert "Before.\n" in result
+        assert "\nAfter." in result
+
+    def test_only_first_occurrence_replaced(self):
+        text = "AAA BBB AAA"
+        result = replace_tool_output_with_context(text, "AAA", "CCC")
+        assert result == "CCC BBB AAA"

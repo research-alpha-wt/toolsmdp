@@ -2,10 +2,10 @@
 
 ## What This Project Is
 
-Segment-level RL for LLM tool use via the Semi-Markov Decision Process framework. Trains LLMs to use tools (Python code blocks) with per-segment credit assignment using PPO and a learned value function. The key insight: decompose trajectories at tool-call boundaries so good tool calls get positive advantage, bad ones get negative advantage, and unnecessary ones get near-zero advantage — all from a single binary outcome reward.
+Segment-level RL for LLM tool use via the Semi-Markov Decision Process framework. Trains LLMs to use tools (Python code blocks) with per-segment credit assignment using PPO and a learned value function. Three segment types — **invoke** (call tool), **assimilate** (distill tool output into `<context>` block), **synthesize** (reason/answer) — each an SMDP option with independent advantage. Good tool calls get positive advantage, bad assimilations get independently negative advantage, unnecessary calls get near-zero advantage — all from a single binary outcome reward.
 
-Paper draft: `ToolSMDP_Paper_Draft_v3.md`
-Implementation plan: `ToolSMDP_Implementation_Plan_v3.md`
+Paper draft: `paper_draft/toolsmdp/main.tex`
+**Milestone tracker: `milestones.md`** — canonical source for what to do next, step by step.
 
 ## What We Did
 
@@ -55,78 +55,111 @@ Resolved all current-milestone container TODOs and simplified code:
 - **Auto dtype**: float16 on T4 (no native bfloat16), bfloat16 on A100/H200
 - **Compute plan**: Lightning.ai T4 (79h free) for Milestones 2-3, save A100/H200 for training
 
+### Session 6 (2026-03-21): Search Index + Milestone Planning
+- **Milestone tracker**: Created `milestones.md` — canonical step-by-step tracker
+- **Decisions**: MATH dataset dropped, no quantization ever, in-process BM25 (not microservice)
+- **Retrieval package** (`retrieval/`):
+  - `extract_corpus.py`: Extracts passages from HotpotQA/Musique/2Wiki HF data
+  - `build_index.py`: Builds BM25Okapi index, saves to pkl
+  - `search.py`: `BM25Search` class with `query()` and singleton `get_search()`
+- **Pre-resolved search**: `executor.py` updated — `extract_search_query_strings()` extracts
+  queries from code, rollout loop resolves via BM25, injects results dict
+- **`test_base_model.py`**: `mode_eval` now auto-loads backend, passes `search_fn`
+- **Container**: `build-index` service added to docker-compose.yml
+- **Local BM25 validated**: 1,855 passages from 150 questions. HotpotQA 54% Recall@5,
+  Musique/2Wiki weak (multi-hop answers not in single passages)
+- **115/115 tests passing** (15 new search tests)
+
+### Session 7 (2026-03-22): Pyserini Wikipedia Search + Simplification
+- **PyseriniSearch**: Pyserini BM25 over `wikipedia-dpr-100w` (21M passages, 9.2 GB, cached)
+- **Simplified search.py**: One backend, one function. Removed BM25Search, auto-detection, classes.
+  `get_search()` returns a callable `query(str, top_k) -> str`.
+- **Removed**: `extract_corpus.py`, `build_index.py`, `build-index` docker service, `rank_bm25` dep,
+  `validate_search.py`, `ToolSMDP_Paper_Draft_v3.md`, `ToolSMDP_Implementation_Plan_v3.md`
+- **Java 21 installed** via winget. JAVA_HOME: `/c/Program Files/Microsoft/jdk-21.0.10.7-hotspot`
+- **`try_search.py`**: Simple script to test queries (edit QUERIES list, run it)
+- **Codebase conventions updated**: added "one way to do things", "flat over nested" rules
+- **110 passed, 2 skipped**
+
+### Session 8 (2026-03-22): Three-Segment Design (invoke/assimilate/synthesize)
+- **Paper updated** with three segment types: invoke, assimilate, synthesize
+- **`<context>` block design** (replaces forced assimilation prompt from paper draft):
+  - Model learns to write `<context>...</context>` after tool output via system prompt instruction
+  - No forced prompt injection — preserves K/V cache, vLLM compatible
+  - Always used (both search and math) for consistent format
+  - Rollout loop detects `</context>` as segment boundary, replaces raw tool output
+- **Two-phase replacement**: (1) code → stdout, (2) raw stdout → `<context>` block
+- **Max 15 segments** (was 5). Each tool call = 2 segments (invoke + assimilate). 15 allows up to 7 tool calls.
+- **Three independent skills trained**: invoke (what to search), assimilate (what to keep), synthesize (how to answer)
+- **Key case analysis**: Case B vs E in paper — good search + bad assimilation separately penalized
+- **Implementation plan updated** in milestones.md — new steps for `<context>` detector, two-phase replacement, segment typing
+
+### Session 9 (2026-03-23): Step 2.0.5 — `<context>` Block Implementation
+- **`core/context_block_detector.py`** (new): `ContextBlockDetection` dataclass, `detect_context_block()` regex, `ContextBlockWatcher` state machine with 256-token budget. Signals: `"context_block_complete"`, `"budget_exceeded"`, `"eos"`.
+- **`core/replacement.py`**: Added `replace_tool_output_with_context()` — Phase-2 replacement (exact string match, swap raw stdout with distilled content).
+- **`core/segment_rollout.py`**: Added `segment_type` field (`"invoke"` | `"assimilate"` | `"synthesize"`), `"context_block"` termination, `total_assimilations` property.
+- **`scripts/test_base_model.py`**: System prompt with `<context>` instruction, `MAX_SEGMENTS=15`, `MAX_ASSIMILATE_TOKENS=256`, full invoke→assimilate→synthesize rollout loop.
+- **Tests**: 23 new detector tests, 5 new replacement tests.
+- **138 passed, 2 skipped**
+
 ## Key Decisions and Why
 
 ### Critic Architecture
-- **Backbone frozen for critic** (`.detach()` on hidden states before critic head). Why: critic head is only 3,584 params; letting critic gradients flow into the backbone would fight with policy gradients. Critic warmup also assumes frozen backbone representations.
-- **Bootstrap targets with stop-gradient** (`target(s_k) = sg[V(s_{k+1})]`). Why: aligns with the paper's core claim that `V(s_{k+1}) - V(s_k)` provides per-state differentiation. Monte Carlo (target = R for all segments) would weaken this. Standard in OpenRLHF, no custom code needed.
-- **3 PPO epochs**, advantages computed once. Why: standard for Search-R1/OpenRLHF; recomputing advantages each epoch requires expensive forward passes at every segment boundary.
-- **KL = 0 initially**, add 1e-4 only if EM drops >10% for 50+ steps. Why: matches Search-R1 baseline for fair comparison; base models don't have instruction-following behavior worth preserving; PPO clip provides implicit constraint.
+- **2-layer MLP head** (hidden dim 1024, ~7.5M params) on shared backbone. Critic gradients flow through backbone.
+- **Monte Carlo targets**: V_target = R for all states in episode. Unbiased, bounded variance (binary R, short episodes).
+- **3 PPO epochs**, advantages computed once.
+- **KL = 0 initially**, add 1e-4 only if EM drops >10% for 50+ steps.
 
-### Segment Mechanics
-- **Max 5 segments**, force EOS at limit, extract answer, score normally. Track hit-rate in wandb.
-- **1024 tokens per segment** (adjustable per task).
-- **Sequential rollout generation** per question, **batched PPO update** across all ~320 segments. Why: tool execution breaks generation pipeline anyway; batching rollouts adds complexity for minimal speedup. PPO update is standard batched training.
+### Segment Mechanics (invoke / assimilate / synthesize)
+- **Three segment types**, each an SMDP option:
+  - **Invoke**: model generates reasoning + code block. Terminates at closing ``` fence. Code executes, stdout replaces code.
+  - **Assimilate**: model reads raw tool output, writes `<context>...</context>` block. Terminates at `</context>`. Raw output replaced by `<context>` block contents.
+  - **Synthesize**: free reasoning or final answer. Terminates at EOS or length limit.
+- **`<context>` block is learned behavior**, not a forced prompt. System prompt instructs: "After seeing tool output, always write the key result in a `<context>...</context>` block before continuing." Enforced by RL: good assimilations → correct answers → positive advantage.
+- **Always use `<context>`**, for both search output (distill 500 tokens) and math output (wrap `42` as `<context>347 * 28 = 9716</context>`). Consistent format across all tools.
+- **Max 15 segments**. Each tool call = 2 segments (invoke + assimilate). Typical 2-tool trajectory: invoke, assimilate, invoke, assimilate, synthesize = 5 segments.
+- **Assimilation budget**: max 256 tokens per `<context>` block.
+- **Two-phase replacement**: (1) code → stdout after invoke, (2) raw stdout → `<context>` block after assimilate. Both code and raw output are transient.
+- **Sequential rollout generation** per question, **batched PPO update** across all segments.
 - **GRPO variant excluded** from implementation. Focus purely on PPO.
 
 ### Tool Interface
-- **Search backend**: local BM25 index OR cached retrieval (both options kept open).
+- **Search**: Pyserini BM25 over Wikipedia (21M passages). `get_search()` returns a callable.
+  Pre-resolved calls: rollout loop extracts queries from code, resolves in parent process, injects results.
 - **Raw Python only** — no separate calculator tool. `search()` is a pre-built function declared in the system prompt. The Python interpreter IS the universal tool.
 - **Error replacement**: comments + `"ERROR: message"` preserved in context. Enables recovery learning (Case E in the paper).
 
 ### Data & Curriculum
 - **Per-batch Tier enforcement**: every batch of 128 has ~90 Tier 1 (needs tools) / ~38 Tier 2 (solvable directly).
 - **Linear curriculum ramp** over first 30% of training: start 80% single-tool, ramp to natural distribution.
-- **Mixing**: 30/70 NQ/HotpotQA for search; 50/50 GSM8K/MATH for math (deferred); 50/25/25 FinQA/GSM8K-subset/HotpotQA-subset for multi-tool.
+- **Mixing**: 30/70 NQ/HotpotQA for search; GSM8K for math; 50/25/25 FinQA/GSM8K-subset/HotpotQA-subset for multi-tool.
 
 ## Gotchas
 
-1. **Model never sees segment boundaries.** The model receives `full_context` (clean natural text). `Trajectory`/`Segment` objects are training-loop bookkeeping ONLY. Segment count is tracked by the rollout loop as it calls `model.generate()` — never inferred from the text. Don't encode segment markers in the context.
+1. **Model never sees segment boundaries as markers.** The model generates continuously. `Trajectory`/`Segment` objects are training-loop bookkeeping ONLY. The rollout loop detects boundaries (``` fence, `</context>`, EOS) and splits segments — the model just writes text.
 
-2. **Comment-preserving replacement erases code.** After execution, the context contains comments + stdout but NOT the code that produced the output. This makes the SMDP partially observed. The paper argues this is fine because tool output is more predictive of future success than the code syntax that produced it. The critic evaluates post-replacement context.
+2. **Two-phase replacement erases both code AND raw output.** After the full invoke→assimilate cycle, the context contains only the `<context>` block — neither the code that produced the search nor the full passage returned by the search. The critic evaluates post-assimilation states.
 
-3. **Critic warmup is essential.** Without it, initial V(s) predictions are random, making early advantages meaningless noise. Three data sources combined: rollout-based (~80K, binary, free), LLM-labeled (~1K, continuous, ~$3-5), contrastive (~8K, structured, free).
+3. **`<context>` detection is a segment boundary.** When the rollout loop sees `</context>`, it: (a) marks the assimilate segment complete, (b) replaces raw tool output with `<context>` contents, (c) starts the next segment (synthesize or invoke). This is analogous to how ``` fence detection works for invoke segments.
 
-4. **No reference model in memory when KL=0.** Saves ~14GB. Load it only if switching to KL=1e-4.
+4. **Critic warmup is essential.** Without it, initial V(s) predictions are random, making early advantages meaningless noise.
 
-5. **Container validated on dev machine (Session 4).** 100/100 tests passing. Use VS Code Dev Containers for visual debugging, or `docker compose run test` from CLI.
+5. **K/V cache must be preserved.** The `<context>` block is part of the model's continuous generation — no prompt injection, no prefix modification. This is why we use a learned `<context>` tag instead of a forced assimilation prompt.
 
 ## What's Left to Do
 
-### Immediate (next session)
-- [x] Get Docker running and validate container build + test suite
-- [x] Download sample datasets (50 examples each for gsm8k, hotpotqa, finqa)
-- [x] `scripts/test_base_model.py` — inference script written, needs GPU to run
-- [ ] Set up Lightning.ai Studio (T4, 79h free)
-- [ ] Run `--mode code_gen` to verify Qwen3.5-4B generates code blocks
-- [ ] Run `--mode eval` on 50-sample files to validate full pipeline
+See `milestones.md` for the full step-by-step tracker.
 
-### Milestone 2: Pre-Training Analysis
-- [ ] Run base model with tools on eval sets (500 samples per dataset)
-- [ ] Build difficulty buckets (1-call, 2-call, 3+-call)
-- [ ] Build Tier 1/2 training splits
-- [ ] Write predictions document (pre-registration)
+**Current:** Milestone 2 (Pre-Training Analysis) — VALIDATED, ready to execute.
+**Step 2.0 (Search Backend) DONE. Step 2.0.5 (`<context>` blocks) DONE.** Next up: Step 2.1 (GPU smoke test with Qwen3.5-4B).
 
-### Milestone 3: Critic Warm-Up
-- [ ] Generate rollout-based warmup data (~80K pairs)
-- [ ] Generate LLM-labeled warmup data (~1K pairs)
-- [ ] Generate contrastive warmup pairs (~8K pairs)
-- [ ] Train critic head on combined data
-
-### Milestone 4: OpenRLHF Integration
-- [ ] Study OpenRLHF internals (ppo_trainer, experience_maker, actor, critic)
-- [ ] Modify experience maker for segment rollout generation
-- [ ] Implement segment advantage computation
-- [ ] PPO loss with segment advantages (all tokens in segment share same scalar)
-- [ ] Custom reward function (exact match, no neural RM)
-- [ ] Critic head initialization from warmup
-- [ ] 10-step integration test on GSM8K
-
-### Milestone 5-7: Training, Evaluation, Paper
-- [ ] 3B scale training + validation
-- [ ] 7B scale runs (only if 3B validates)
-- [ ] Full evaluation on all benchmarks with difficulty bucketing
-- [ ] Diagnostic figures and paper tables
+### Key decisions:
+- MATH dataset dropped entirely
+- No quantization — always run full precision (float16 on T4, bfloat16 on A100+)
+- Search: Pyserini BM25 over Wikipedia (21M passages). One backend, no fallback chain.
+- Pre-resolved search calls (rollout loop resolves queries before sandboxed execution)
+- Musique HF path: `bdsaglam/musique` (not `drt/musique`)
+- TriviaQA HF path: `mandarjoshi/trivia_qa` config `rc`
 
 ## How to Run
 
@@ -134,32 +167,35 @@ Resolved all current-milestone container TODOs and simplified code:
 # Run tests (local with Docker)
 docker compose run test
 
-# Interactive dev shell
-docker compose run dev
+# Run tests (local with conda — quick one-liner)
+conda run -n toolsmdp pytest tests/ -v
 
 # Download datasets
 docker compose run download python -m data.download_and_format --datasets gsm8k hotpotqa finqa --max-samples 50
 
-# Download with cap (500 per split)
-docker compose run download python -m data.download_and_format --datasets hotpotqa --max-samples 500
+# Test search locally (edit QUERIES list in the script)
+python scripts/try_search.py
 
 # Base model inference (requires GPU — run on Lightning.ai or similar)
 python -m scripts.test_base_model --mode code_gen              # smoke test
 python -m scripts.test_base_model --mode pipeline              # full SMDP loop
-python -m scripts.test_base_model --mode eval --data data_local/eval_splits/gsm8k_test_50.jsonl
-python -m scripts.test_base_model --mode eval --data data_local/eval_splits/hotpotqa_dev_50.jsonl --num-rollouts 4
+python -m scripts.test_base_model --mode eval --data data_local/eval_splits/hotpotqa_dev_50.jsonl
 
-# Lightning.ai setup (no Docker needed)
+# Lightning.ai setup
 git clone <repo> && cd toolsmdp
 pip install -e ".[train,dev]"
 pytest tests/ -v
 ```
 
+See `SETUP.md` for conda environment setup and JAVA_HOME configuration.
+
 ## Codebase Conventions
-- **This is research code, not production code.** Keep it clean, easy to read, and small. Favor simplicity over robustness.
-- No unnecessary abstractions, helpers, or indirection. Three similar lines > a premature helper function.
-- No verbose docstrings. A one-liner is fine; multi-paragraph docstrings are not. Let function names and signatures speak.
-- No defensive coding for impossible scenarios. Trust internal code paths.
-- Modular package structure: `core/`, `sandbox/`, `data/`, `tests/`
+- **This is research code, not production code.** Keep it simple, readable, and small.
+- **One way to do things.** Don't build multiple backends, fallback chains, or abstraction layers. Pick one approach and use it directly.
+- **Flat over nested.** Functions over classes when a class would just have one method. No inheritance hierarchies. No factory patterns.
+- **No unnecessary abstractions.** Three similar lines > a premature helper function. No wrappers around libraries that add no value.
+- **Minimal docstrings.** A one-liner is fine. Multi-paragraph docstrings are not. Let function names and signatures speak.
+- **No defensive coding** for impossible scenarios. Trust internal code paths.
+- Modular package structure: `core/`, `sandbox/`, `data/`, `retrieval/`, `tests/`
 - All paths via `$DATA_ROOT` and `$CHECKPOINT_ROOT` env vars (compute-agnostic)
 - Container-first: all deps managed via `pyproject.toml`, never `pip install` on bare metal

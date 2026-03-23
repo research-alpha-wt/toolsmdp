@@ -1,3 +1,5 @@
+import json
+import re
 import subprocess
 import sys
 import textwrap
@@ -40,12 +42,43 @@ _SEARCH_PLACEHOLDER = textwrap.dedent("""\
 """)
 
 
+def _build_search_func(search_results: dict[str, str]) -> str:
+    """Build a search() function that returns pre-resolved results."""
+    results_json = json.dumps(search_results)
+    return textwrap.dedent(f"""\
+        import json as _json
+        _SEARCH_RESULTS = _json.loads('''{results_json}''')
+        def search(query):
+            return _SEARCH_RESULTS.get(query, "No results found for: " + query)
+    """)
+
+
+def extract_search_queries(code: str) -> list[str]:
+    """Extract search() query strings from code. Handles search("...") and search('...')."""
+    return re.findall(r'''search\(\s*(?:"([^"]+)"|'([^']+)')\s*\)''', code)
+
+
+def extract_search_query_strings(code: str) -> list[str]:
+    """Return deduplicated list of search query strings found in code."""
+    queries = []
+    for match in extract_search_queries(code):
+        q = match[0] or match[1]  # one of the two groups matched
+        if q and q not in queries:
+            queries.append(q)
+    return queries
+
+
 def execute_code(
     code: str,
     search_enabled: bool = False,
+    search_results: dict[str, str] | None = None,
     timeout: int = TIMEOUT_SECONDS,
 ) -> str:
-    """Execute Python code in a sandboxed subprocess. Returns stdout or 'ERROR: ...'."""
+    """Execute Python code in a sandboxed subprocess. Returns stdout or 'ERROR: ...'.
+
+    If search_results is provided, search() calls use pre-resolved results.
+    If search_enabled=True but no search_results, a placeholder is used.
+    """
     if not code.strip():
         return ""
 
@@ -54,7 +87,9 @@ def execute_code(
             return f"ERROR: Blocked operation: {pattern}"
 
     script = _IMPORT_GUARD.format(blocked=repr(_BLOCKED_MODULES))
-    if search_enabled:
+    if search_results:
+        script += _build_search_func(search_results)
+    elif search_enabled:
         script += _SEARCH_PLACEHOLDER
     script += "\n" + code
 

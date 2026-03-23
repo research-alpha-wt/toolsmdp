@@ -1,0 +1,50 @@
+{"question": "what is the net change in net revenue during 2015 for entergy corporation?", "gold_answer": "94.0", "dataset": "finqa", "split": "test"}
+{"question": "what percentage of total facilities as measured in square feet are leased?", "gold_answer": "0.14464", "dataset": "finqa", "split": "test"}
+{"question": "what is the percentage change in cash flow hedges in 2011 compare to the 2010?", "gold_answer": "0.09864", "dataset": "finqa", "split": "test"}
+{"question": "what portion of total purchase price is related to stock awards?", "gold_answer": "0.02899", "dataset": "finqa", "split": "test"}
+{"question": "what was the difference in percentage cumulative total shareholder return on masco common stock versus the s&p 500 index for the five year period ended 2017?", "gold_answer": "1.1197", "dataset": "finqa", "split": "test"}
+{"question": "what was the percentage change in total rental expense under operating leases from july 2 , 2005 to july 1 , 2006?", "gold_answer": "0.06757", "dataset": "finqa", "split": "test"}
+{"question": "what percent of total recourse debt is current?", "gold_answer": "0.10039", "dataset": "finqa", "split": "test"}
+{"question": "what percentage of future minimum rental payments are due in 2018?", "gold_answer": "0.11689", "dataset": "finqa", "split": "test"}
+{"question": "did altria outperform the s&p 500?", "gold_answer": "yes", "dataset": "finqa", "split": "test"}
+{"question": "what was the change in unrecognized tax benefits from the end of 2014 to the end of 2015?", "gold_answer": "-35.0", "dataset": "finqa", "split": "test"}
+{"question": "what is the growth rate in the balance of standby letters of credit from 2006 to 2007?", "gold_answer": "-0.04365", "dataset": "finqa", "split": "test"}
+{"question": "what is the debt-to-asset ratio?", "gold_answer": "0.22429", "dataset": "finqa", "split": "test"}
+{"question": "what portion of the total noncancelable future lease commitments are due in fiscal year of 2019?", "gold_answer": "0.24566", "dataset": "finqa", "split": "test"}
+{"question": "was the five year total return of the 2019 peer group greater than the 2018 peer group?", "gold_answer": "no", "dataset": "finqa", "split": "test"}
+{"question": "what was the percentage change in deferred tax assets and regulatory assets from 2013 to 2014", "gold_answer": "0.01714", "dataset": "finqa", "split": "test"}
+{"question": "what was the average net annual change in discounted future net cash flows ( in millions ) for the years 2011 , 2010 , and 2009?", "gold_answer": "3297.66667", "dataset": "finqa", "split": "test"}
+{"question": "assuming each continent has the same number of destinations , approximately how many destinations does each continent have?", "gold_answer": "65.0", "dataset": "finqa", "split": "test"}
+{"question": "what was the average net revenue between 2016 and 2017 in millions", "gold_answer": "705.25", "dataset": "finqa", "split": "test"}
+{"question": "the combined amount of accrued interest and penalties related to tax positions taken on our tax returns and included in non-current income taxes payable was what percent of the total ending balance as of november 28 2008?", "gold_answer": "0.10964", "dataset": "finqa", "split": "test"}
+{"question": "in 2010 and 2009 , what was the total fair value in billions of assets segregated for the benefit of securities and futures brokerage customers?", "gold_answer": "68.9", "dataset": "finqa", "split": "test"}
+{"question": "what was the percentage change in the commercial mortgage loans designated for sale at fair value from 2008 to 2009", "gold_answer": "-0.08422", "dataset": "finqa", "split": "test"}
+{"question": "what was the difference in percentage cumulative 5-year total shareholder return on common stock fidelity national information services , inc . compared to the s&p 500 for the period ending 12/16?", "gold_answer": "1.1363", "dataset": "finqa", "split": "test"}
+{"question": "for the quarter ended march 312015 what was the percentage change in the share price from the highest to the lowest", "gold_answer": "0.09302", "dataset": "finqa", "split": "test"}
+{"question": "of the total contractual obligations and off-balance sheet arrangements contractual obligations what percentage is due to capital lease obligations?", "gold_answer": "0.01741", "dataset": "finqa", "split": "test"}
+{"question": "what is the ratio of the total flight attendants to total maintenance personnel", "gold_answer": "1.59172", "dataset": "finqa", "split": "test"}
+{"question": "as of december 2007 what was the ratio of the square footage in alpharetta georgia to charlotte north carolina", "gold_answer": "2.63855", "dataset": "finqa", "split": "test"}
+{"question": "in 2010 what was the percent of the income tax benefit to the stock based compensation cost", "gold_answer": "0.34807", "dataset": "finqa", "split": "test"}
+{"question": "what is the percentage change in the the gross liability for unrecognized tax benefits during 2008 compare to 2007?", "gold_answer": "-0.30851", "dataset": "finqa", "split": "test"}
+{"question": "what was the total impairment costs recorded from 2003 to 2005 in millions", "gold_answer": "5.8", "dataset": "finqa", "split": "test"}
+{"question": "what is the borrowing under the term loan facility as a percentage of the total contractual maturities of long-term debt obligations due subsequent to december 31 , 2016?", "gold_answer": "1.13599", "dataset": "finqa", "split": "test"}
+{"question": "in 2015 what was the percent of the total operating revenues associated with agriculture products", "gold_answer": "0.16417", "dataset": "finqa", "split": "test"}
+{"question": "what percent of net interest revenue where total operating expenses in 2009?", "gold_answer": "0.28238", "dataset": "finqa", "split": "test"}
+{"question": "what was the greatest provision for income taxes , in millions?", "gold_answer": "829.0", "dataset": "finqa", "split": "test"}
+{"question": "in 2018 what was the percent of the cib markets net interest income as part of the managed interest income", "gold_answer": "0.05543", "dataset": "finqa", "split": "test"}
+{"question": "what would the fair value of total securities available for sale be without the fair value of securities classified as corporate stocks as of december 31 , 2012?", "gold_answer": "61545.0", "dataset": "finqa", "split": "test"}
+{"question": "assuming the same level of settlements as in fiscal 2007 , what would be the ending balance at march 31 2008 in millions for unrecognized tax benefits?\\\\n", "gold_answer": "112.0", "dataset": "finqa", "split": "test"}
+{"question": "as of december 2012 what is the percent of the square footage not leased to the total square footage in alpharetta , georgia", "gold_answer": "0.64961", "dataset": "finqa", "split": "test"}
+{"question": "as of december 2007 what was the percent of the square footage in alpharetta georgia not yet leased", "gold_answer": "0.75799", "dataset": "finqa", "split": "test"}
+{"question": "what is the total amount of stock options cancelled in millions during 2017 , 2016 and 2015?", "gold_answer": "12.1", "dataset": "finqa", "split": "test"}
+{"question": "in 2004 and 2003 , what were the total shares of common stock that were issued to employees?", "gold_answer": "3876875.0", "dataset": "finqa", "split": "test"}
+{"question": "what is the net change in net revenue for entergy wholesale commodities during 2012?", "gold_answer": "-191.0", "dataset": "finqa", "split": "test"}
+{"question": "what was the difference in percentage cumulative total return for goldman sachs group inc . and the s&p 500 index for the five year period ending 12/31/13?", "gold_answer": "0.1216", "dataset": "finqa", "split": "test"}
+{"question": "as of december 31 , 2017 what was the value of the granted share awards", "gold_answer": "9294571.92", "dataset": "finqa", "split": "test"}
+{"question": "what percent of total contractual obligations is categorized as long term debt?", "gold_answer": "0.45103", "dataset": "finqa", "split": "test"}
+{"question": "what was the average cash flow from 2004 to 2006", "gold_answer": "892.3", "dataset": "finqa", "split": "test"}
+{"question": "what is the total value of securities issued and approved by security holders , ( in millions ) ?", "gold_answer": "31.32382", "dataset": "finqa", "split": "test"}
+{"question": "what is the percentage change in revenue generated from non-us currencies from 2015 to 2016?", "gold_answer": "0.42889", "dataset": "finqa", "split": "test"}
+{"question": "what was the percentage decrease in cash flows from operations from 2009 to 2010?", "gold_answer": "0.07951", "dataset": "finqa", "split": "test"}
+{"question": "what percentage of the total carrying amount of investment securities is the securities held to maturity?", "gold_answer": "16.93811", "dataset": "finqa", "split": "test"}
+{"question": "for the quarter ended 12/29/2018 what was the percent of the total shares bought after 11/25/2018", "gold_answer": "0.3254", "dataset": "finqa", "split": "test"}

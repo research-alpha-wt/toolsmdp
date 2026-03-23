@@ -1,0 +1,50 @@
+{"question": "what is the the interest expense in 2009?", "gold_answer": "3.8", "dataset": "finqa", "split": "train"}
+{"question": "during the 2012 year , did the equity awards in which the prescribed performance milestones were achieved exceed the equity award compensation expense for equity granted during the year?", "gold_answer": "yes", "dataset": "finqa", "split": "train"}
+{"question": "what was the total operating expenses in 2018 in millions", "gold_answer": "41932.20339", "dataset": "finqa", "split": "train"}
+{"question": "what percentage of total cash and investments as of dec . 29 2012 was comprised of available-for-sale investments?", "gold_answer": "0.53232", "dataset": "finqa", "split": "train"}
+{"question": "what is the growth rate in net revenue in 2008?", "gold_answer": "-0.03219", "dataset": "finqa", "split": "train"}
+{"question": "what was the growth rate of the loans held-for-sale that are carried at locom from 2009 to 2010", "gold_answer": "0.97656", "dataset": "finqa", "split": "train"}
+{"question": "for acquired customer-related and network location intangibles , what is the expected annual amortization expenses , in millions?", "gold_answer": "7.385", "dataset": "finqa", "split": "train"}
+{"question": "in 2019 what was the percent of the net earnings to the net cash provided by operating activities", "gold_answer": "0.63634", "dataset": "finqa", "split": "train"}
+{"question": "what percentage decrease occurred from 2011-2012 for deferred acquisition payments?", "gold_answer": "96.55172", "dataset": "finqa", "split": "train"}
+{"question": "how is net change in cash from financing activity affected by the share repurchase during december 20018 , ( in millions ) ?", "gold_answer": "56.57146", "dataset": "finqa", "split": "train"}
+{"question": "what is the change in net assets from 2007 to 2008?", "gold_answer": "6.9", "dataset": "finqa", "split": "train"}
+{"question": "in millions , what is the total of home equity lines of credit?", "gold_answer": "22929.0", "dataset": "finqa", "split": "train"}
+{"question": "what is the percent of the labor-related deemed claim as part of the total reorganization items net in 2013", "gold_answer": "0.65273", "dataset": "finqa", "split": "train"}
+{"question": "what is the percent change in net revenue between 2007 and 2008?", "gold_answer": "-0.00317", "dataset": "finqa", "split": "train"}
+{"question": "in 2013 what percentage of total net revenues for the investing & lending segment were due to debt securities and loans?", "gold_answer": "0.27743", "dataset": "finqa", "split": "train"}
+{"question": "what percentage of total reorganization items net consisted of labor-related deemed claim?", "gold_answer": "0.65644", "dataset": "finqa", "split": "train"}
+{"question": "what was the percent of the total contractual payment obligations that was associated with operating lease obligations", "gold_answer": "0.2023", "dataset": "finqa", "split": "train"}
+{"question": "what was the percent of the total long-term debt including current portion excluding capital lease obligations that was due in 2019", "gold_answer": "0.12032", "dataset": "finqa", "split": "train"}
+{"question": "what percent of total facilities are leased?", "gold_answer": "0.03614", "dataset": "finqa", "split": "train"}
+{"question": "as part of the proceeds from the clear wire transactions what was the percent of the gain recognized included in the equity investments , net on the consolidated statements of income .", "gold_answer": "0.93404", "dataset": "finqa", "split": "train"}
+{"question": "on what percent of trading days were there market gains above $ 210 million?", "gold_answer": "0.04598", "dataset": "finqa", "split": "train"}
+{"question": "in february 2016 what was the percent reduction in the board of directors authorized the repurchase to the february 2014", "gold_answer": "-0.16667", "dataset": "finqa", "split": "train"}
+{"question": "in millions between 2014 and 2013 , what was the change in net derivative liabilities under bilateral agreements?\\\\n", "gold_answer": "13588.0", "dataset": "finqa", "split": "train"}
+{"question": "what was the net notional amounts of purchases and sales under sfas 140 in 2003 ( us$ b ) ?", "gold_answer": "7.0", "dataset": "finqa", "split": "train"}
+{"question": "what is the percentage of consolidated communities among the total communities?", "gold_answer": "0.99671", "dataset": "finqa", "split": "train"}
+{"question": "what portion of total backlog is related to ingalls segment?", "gold_answer": "0.37399", "dataset": "finqa", "split": "train"}
+{"question": "what is percentage change in total conduit asset from 2007 to 2008?", "gold_answer": "-0.16849", "dataset": "finqa", "split": "train"}
+{"question": "what was the difference in operating profit margins as adjusted from 2015 to 2016?", "gold_answer": "0.016", "dataset": "finqa", "split": "train"}
+{"question": "what was the total amount lost from the bond authorization to the withdrawn?", "gold_answer": "13.0", "dataset": "finqa", "split": "train"}
+{"question": "what was the average effect , in millions , of the dilutive securities in 2012-14?", "gold_answer": "0.96667", "dataset": "finqa", "split": "train"}
+{"question": "what is the percentage change in total trade receivables?", "gold_answer": "-0.03835", "dataset": "finqa", "split": "train"}
+{"question": "considering the year 2016 , what is the average revenue?", "gold_answer": "0.25", "dataset": "finqa", "split": "train"}
+{"question": "what was the total fees earned in 2016 for management , leasing and construction and development", "gold_answer": "14.9", "dataset": "finqa", "split": "train"}
+{"question": "in 2015 what was the ratio of the defined benefit plan income to defined benefit plan recognition of actuarial losses", "gold_answer": "-2.44", "dataset": "finqa", "split": "train"}
+{"question": "what was the percent of the growth of the the priceline group inc . from 2014 to 2015", "gold_answer": "0.1182", "dataset": "finqa", "split": "train"}
+{"question": "what is the cumulative total shareholder return on state street's common stock in 2012 as a percentage of the average shareholder return on common stock in the s&p 500?", "gold_answer": "0.55963", "dataset": "finqa", "split": "train"}
+{"question": "as of december 31 , 2012 what was the percentage change in net reserves from 2011", "gold_answer": "-0.11349", "dataset": "finqa", "split": "train"}
+{"question": "what was the percentage change in total trade receivables net from 2015 to 2016?", "gold_answer": "-0.05315", "dataset": "finqa", "split": "train"}
+{"question": "what percent of the share repurchases were in the fourth quarter?", "gold_answer": "0.23466", "dataset": "finqa", "split": "train"}
+{"question": "what is the percentage change in the balance of goodwill from 2015 to 2016?", "gold_answer": "0.02602", "dataset": "finqa", "split": "train"}
+{"question": "what was the average of the operating lease obligations between 2020 and 2024", "gold_answer": "144.86", "dataset": "finqa", "split": "train"}
+{"question": "what is the amount of interest payment incurred from the bonds issued by the mississippi business finance corporation?", "gold_answer": "3.26849", "dataset": "finqa", "split": "train"}
+{"question": "in 2003 what was the percent of the total revenues from vies", "gold_answer": "0.07467", "dataset": "finqa", "split": "train"}
+{"question": "how often did the firm post gains exceeding $ 200 million in 2012?\\\\n", "gold_answer": "0.03065", "dataset": "finqa", "split": "train"}
+{"question": "what percentage of total long-term assets under supervision are comprised of fixed income in 2015?", "gold_answer": "0.57484", "dataset": "finqa", "split": "train"}
+{"question": "at january 29 , 2007 what was the percent of the estimated fair value of the goodwill to the total purchase price", "gold_answer": "0.27867", "dataset": "finqa", "split": "train"}
+{"question": "what was the average shares granted as part of the long-term incentive plan , in the first quarter of 2012 , 2011 and 2010\\\\n", "gold_answer": "192501.5", "dataset": "finqa", "split": "train"}
+{"question": "did jpmorgan chase outperform the kbw bank index?", "gold_answer": "yes", "dataset": "finqa", "split": "train"}
+{"question": "what is the mathematical range for tedeemable noncontrolling interests and call options with affiliates from 2013-2017?", "gold_answer": "36.7", "dataset": "finqa", "split": "train"}
+{"question": "for the years ended december 31 2017 , 2016 , and 2015 , what was the average beginning balance in millions?", "gold_answer": "93670.33333", "dataset": "finqa", "split": "train"}

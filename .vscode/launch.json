@@ -2,6 +2,17 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Run Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "env": {
+        "JAVA_HOME": "C:\\Program Files\\Microsoft\\jdk-21.0.10.7-hotspot"
+      }
+    },
+    {
       "name": "Debug Tests",
       "type": "debugpy",
       "request": "launch",

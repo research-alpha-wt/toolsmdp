@@ -21,14 +21,16 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from core.code_block_detector import detect_code_block
-from core.replacement import replace_code_block
+from core.context_block_detector import detect_context_block
+from core.replacement import replace_code_block, replace_tool_output_with_context
 from core.reward import compute_reward, extract_answer
 from core.segment_rollout import Segment, Trajectory
-from sandbox.executor import execute_code
+from sandbox.executor import execute_code, extract_search_query_strings
 
 MODEL_ID = "Qwen/Qwen3.5-4B"
-MAX_SEGMENTS = 5
+MAX_SEGMENTS = 15
 MAX_TOKENS_PER_SEGMENT = 1024
+MAX_ASSIMILATE_TOKENS = 256
 
 SYSTEM_PROMPT = """\
 You are a helpful assistant that solves problems step by step.
@@ -43,6 +45,9 @@ print(result)
 The code will be executed and you will see the output. You can use this to:
 - Do arithmetic or complex calculations
 - Search for information using search(query)
+
+After seeing tool output, always write the key result in a <context>...</context> block before continuing your reasoning. For example:
+<context>The population of France is approximately 67 million.</context>
 
 When you have the final answer, state it clearly as: "The answer is <answer>."
 """
@@ -100,41 +105,85 @@ def generate_segment(model, tokenizer, context: str, max_new_tokens: int = MAX_T
 
 
 def run_single_rollout(model, tokenizer, question: str, dataset: str,
-                       search_enabled: bool = False) -> Trajectory:
-    """Run the full SMDP pipeline for one question."""
+                       search_enabled: bool = False, search_fn=None) -> Trajectory:
+    """Run the full SMDP pipeline for one question.
+
+    Three segment types: invoke (code block), assimilate (<context> block), synthesize (reasoning/EOS).
+    Each tool call produces two segments: invoke → assimilate. If the model skips <context>,
+    no assimilate segment is created and raw output persists.
+    """
     trajectory = Trajectory()
     context = question
 
     for seg_idx in range(MAX_SEGMENTS):
         generated = generate_segment(model, tokenizer, context)
-        detection = detect_code_block(generated)
+        code_detection = detect_code_block(generated)
 
-        if detection is None:
-            # No code block — final segment
+        if code_detection is None:
+            # No code block — check if this is an assimilate or synthesize segment
+            ctx_detection = detect_context_block(generated)
+            if ctx_detection is not None:
+                # Assimilate segment — model wrote <context>...</context>
+                segment = Segment(
+                    start_context=context,
+                    generated_text=generated,
+                    segment_type="assimilate",
+                    termination="context_block",
+                )
+                trajectory.segments.append(segment)
+
+                # Phase-2 replacement: find the last tool output and replace with context content
+                last_invoke = next(
+                    (s for s in reversed(trajectory.segments) if s.segment_type == "invoke"),
+                    None,
+                )
+                if last_invoke and last_invoke.tool_output:
+                    replaced = replace_tool_output_with_context(
+                        context + "\n" + generated,
+                        last_invoke.tool_output,
+                        ctx_detection.content,
+                    )
+                    context = replaced
+                else:
+                    context = context + "\n" + generated
+                continue
+
+            # Synthesize segment — final reasoning / answer
             segment = Segment(
                 start_context=context,
                 generated_text=generated,
+                segment_type="synthesize",
                 termination="eos",
             )
             trajectory.segments.append(segment)
             trajectory.full_context = context + "\n" + generated
             break
 
-        # Code block found — execute it
-        stdout = execute_code(detection.executable, search_enabled=search_enabled)
-        replaced = replace_code_block(generated, detection, stdout)
+        # Code block found — this is an invoke segment
+        # Pre-resolve search calls if we have a search backend
+        search_results = None
+        if search_fn and search_enabled:
+            queries = extract_search_query_strings(code_detection.executable)
+            if queries:
+                search_results = {q: search_fn(q) for q in queries}
+
+        stdout = execute_code(code_detection.executable, search_enabled=search_enabled,
+                              search_results=search_results)
+        replaced = replace_code_block(generated, code_detection, stdout)
 
         segment = Segment(
             start_context=context,
             generated_text=generated,
+            segment_type="invoke",
             termination="tool_call",
-            tool_code=detection.executable,
-            tool_comments=detection.comments,
+            tool_code=code_detection.executable,
+            tool_comments=code_detection.comments,
             tool_output=stdout,
         )
         trajectory.segments.append(segment)
 
         # Build next context: original question + replaced output so far
+        # This is the transient state s̃ with raw tool output
         context = question + "\n\n" + replaced
 
         if seg_idx == MAX_SEGMENTS - 1:
@@ -200,8 +249,9 @@ def mode_pipeline(model, tokenizer):
 
         print(f"  Segments: {traj.num_segments}")
         print(f"  Tool calls: {traj.total_tool_calls}")
+        print(f"  Assimilations: {traj.total_assimilations}")
         for i, seg in enumerate(traj.segments):
-            print(f"  Segment {i}: {seg.termination}", end="")
+            print(f"  Segment {i}: {seg.segment_type}/{seg.termination}", end="")
             if seg.tool_code:
                 print(f" | code: {seg.tool_code[:60]}...", end="")
             if seg.tool_output:
@@ -232,6 +282,14 @@ def mode_eval(model, tokenizer, data_path: str, num_rollouts: int = 1):
 
     search_enabled = dataset in ("hotpotqa", "nq", "musique", "2wiki", "triviaqa")
 
+    search_fn = None
+    if search_enabled:
+        try:
+            from retrieval.search import get_search
+            search_fn = get_search()
+        except (ImportError, RuntimeError) as e:
+            print(f"No search backend available ({e}). Using placeholder.")
+
     results = []
     for i, ex in enumerate(examples):
         question = ex["question"]
@@ -245,7 +303,8 @@ def mode_eval(model, tokenizer, data_path: str, num_rollouts: int = 1):
 
         for r in range(num_rollouts):
             traj = run_single_rollout(model, tokenizer, question, dataset,
-                                       search_enabled=search_enabled)
+                                       search_enabled=search_enabled,
+                                       search_fn=search_fn)
             reward = compute_reward(traj.full_context, gold, dataset)
             pred = extract_answer(traj.full_context, dataset)
 

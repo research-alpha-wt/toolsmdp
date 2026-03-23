@@ -18,6 +18,8 @@ train = [
     "torch",
     "vllm",
     "wandb",
+    "pyserini",
+    "faiss-cpu",
 ]
 dev = [
     "pytest",
@@ -25,7 +27,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["core*", "sandbox*", "data*"]
+include = ["core*", "sandbox*", "data*", "retrieval*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

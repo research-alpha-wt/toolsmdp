@@ -5,7 +5,17 @@
       "Bash(ls \"C:\\\\Users\\\\abhijitkumar\\\\Research\\\\toolsmdp/.devcontainer\" 2>/dev/null; echo \"exit: $?\")",
       "Bash(cd \"C:\\\\Users\\\\abhijitkumar\\\\Research\\\\toolsmdp\" && docker compose build test 2>&1)",
       "Bash(python --version 2>&1; pip --version 2>&1; where python 2>/dev/null; where pip 2>/dev/null)",
-      "Bash(where uv:*)"
+      "Bash(where uv:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(docker info:*)",
+      "Bash(docker compose:*)",
+      "Bash(where java:*)",
+      "Bash(winget install:*)",
+      "Bash(pip install:*)",
+      "Bash(export JAVA_HOME=\"/c/Program Files/Microsoft/jdk-21.0.10.7-hotspot\")",
+      "Bash(\"$JAVA_HOME/bin/java\" -version)"
     ]
   }
 }

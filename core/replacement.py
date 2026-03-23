@@ -23,3 +23,16 @@ def replace_code_block(text: str, detection: CodeBlockDetection, stdout: str) ->
     replacement = "\n".join(parts)
 
     return text[:detection.start] + replacement + text[detection.end:]
+
+
+def replace_tool_output_with_context(text: str, tool_output: str, context_content: str) -> str:
+    """Phase-2 replacement: swap raw tool output for distilled <context> content.
+
+    After the model writes <context>key fact</context>, the raw stdout from
+    the tool call is replaced with just the distilled content. Both the code
+    AND the raw output vanish — only the model's summary remains.
+    """
+    idx = text.find(tool_output)
+    if idx == -1:
+        return text
+    return text[:idx] + context_content + text[idx + len(tool_output):]
