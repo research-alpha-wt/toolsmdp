@@ -70,7 +70,7 @@ def load_model(device: str = "auto"):
     dtype = torch.float16 if not torch.cuda.is_bf16_supported() else torch.bfloat16
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_ID,
-        torch_dtype=dtype,
+        dtype=dtype,
         device_map=device,
         trust_remote_code=True,
     )
