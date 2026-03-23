@@ -101,13 +101,18 @@ def run_question(model, tokenizer, question, search_enabled=False, search_fn=Non
         print(f"\n--- Segment {seg_idx} ---")
         generated = generate(model, tokenizer, context, sys_prompt)
 
+        # Always show raw LLM output first
+        print(f"[RAW LLM OUTPUT]")
+        print(generated)
+        print(f"[/RAW LLM OUTPUT]")
+
         code_det = detect_code_block(generated)
         ctx_det = detect_context_block(generated)
 
         if code_det is not None:
             # INVOKE segment
-            print(f"[INVOKE] Code block detected:")
-            print(f"  Code: {code_det.executable}")
+            print(f"\n  >> Classified: INVOKE")
+            print(f"  >> Code: {code_det.executable}")
 
             search_results = None
             if search_fn and search_enabled:
@@ -115,25 +120,24 @@ def run_question(model, tokenizer, question, search_enabled=False, search_fn=Non
                 if queries:
                     search_results = {q: search_fn(q) for q in queries}
                     for q in queries:
-                        print(f"  Search: \"{q}\"")
+                        print(f"  >> Search: \"{q}\"")
 
             stdout = execute_code(code_det.executable, search_enabled=search_enabled,
                                   search_results=search_results)
-            print(f"  Output: {stdout[:200]}{'...' if len(stdout) > 200 else ''}")
+            print(f"  >> Execution output: {stdout[:300]}{'...' if len(stdout) > 300 else ''}")
 
             replaced = replace_code_block(generated, code_det, stdout)
             context = question + "\n\n" + replaced
 
         elif ctx_det is not None:
             # ASSIMILATE segment
-            print(f"[ASSIMILATE] Context block detected:")
-            print(f"  Content: {ctx_det.content}")
+            print(f"\n  >> Classified: ASSIMILATE")
+            print(f"  >> Context content: {ctx_det.content}")
             context = context + "\n" + generated
 
         else:
             # SYNTHESIZE segment
-            print(f"[SYNTHESIZE] Final reasoning:")
-            print(f"  {generated[:500]}{'...' if len(generated) > 500 else ''}")
+            print(f"\n  >> Classified: SYNTHESIZE")
 
             # Check for <answer> tag
             import re
