@@ -5,7 +5,7 @@ description = "Segment-level RL for LLM tool use via the SMDP framework"
 requires-python = ">=3.10"
 dependencies = [
     "datasets",
-    "transformers",
+    "transformers>=4.51",
     "tokenizers",
     "pandas",
     "jsonlines",
