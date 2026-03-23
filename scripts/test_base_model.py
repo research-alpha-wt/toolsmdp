@@ -21,36 +21,42 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from core.code_block_detector import detect_code_block
-from core.context_block_detector import detect_context_block
-from core.replacement import replace_code_block, replace_tool_output_with_context
+from core.replacement import replace_code_block
 from core.reward import compute_reward, extract_answer
 from core.segment_rollout import Segment, Trajectory
 from sandbox.executor import execute_code, extract_search_query_strings
 
 MODEL_ID = "Qwen/Qwen2.5-3B-Instruct"
-MAX_SEGMENTS = 15
+MAX_TOOL_CALLS = 7
 MAX_TOKENS_PER_SEGMENT = 1024
-MAX_ASSIMILATE_TOKENS = 256
 
 SYSTEM_PROMPT = """\
 You are a helpful assistant that solves problems step by step.
-You have access to a Python interpreter. To use it, write code in a fenced block:
+
+## Tools
+You have access to a Python interpreter for computation and information retrieval. Write code in a fenced block:
 
 ```python
-# your code here
-result = 2 + 2
-print(result)
+your code here
 ```
 
-The code will be executed and you will see the output. You can use this to:
-- Do arithmetic or complex calculations
-- Search for information using search(query)
+The code will be executed and you will see its printed output. Use code blocks ONLY when you need to:
+- Compute something you cannot do reliably in your head (arithmetic, logic, data processing)
+- Search for information you do not already know using search(query)
 
-After seeing tool output, always write the key result in a <context>...</context> block before continuing your reasoning. For example:
-<context>The population of France is approximately 67 million.</context>
+Do NOT write code for things you already know the answer to.
 
-When you have the final answer, write it in an answer block:
-<answer>your final answer here</answer>
+## <context> block
+After a code block executes and you see the tool output, write a <context> block to extract the key information relevant to answering the question. Only use <context> blocks immediately after tool output. For example:
+
+Tool output: "Paris is the capital of France. It has a population of 2.1 million in the city proper and 12.4 million in the metro area..."
+<context>Paris population: 2.1 million (city), 12.4 million (metro)</context>
+
+## <answer> block
+When you have the final answer, write ONLY the answer inside an answer block with no extra words:
+<answer>42</answer>
+<answer>William Shakespeare</answer>
+<answer>Paris</answer>
 """
 
 SEARCH_PROMPT_ADDITION = """
@@ -106,49 +112,20 @@ def generate_segment(model, tokenizer, context: str, max_new_tokens: int = MAX_T
 
 def run_single_rollout(model, tokenizer, question: str, dataset: str,
                        search_enabled: bool = False, search_fn=None) -> Trajectory:
-    """Run the full SMDP pipeline for one question.
+    """Run the SMDP pipeline for one question using batch generation.
 
-    Three segment types: invoke (code block), assimilate (<context> block), synthesize (reasoning/EOS).
-    Each tool call produces two segments: invoke → assimilate. If the model skips <context>,
-    no assimilate segment is created and raw output persists.
+    Loop: generate → check for <answer> (done) or code block (execute, re-generate).
+    <context> blocks stay in text as-is (Phase-2 replacement needs token-by-token generation).
     """
     trajectory = Trajectory()
     context = question
 
-    for seg_idx in range(MAX_SEGMENTS):
+    for tool_call_idx in range(MAX_TOOL_CALLS):
         generated = generate_segment(model, tokenizer, context)
         code_detection = detect_code_block(generated)
 
         if code_detection is None:
-            # No code block — check if this is an assimilate or synthesize segment
-            ctx_detection = detect_context_block(generated)
-            if ctx_detection is not None:
-                # Assimilate segment — model wrote <context>...</context>
-                segment = Segment(
-                    start_context=context,
-                    generated_text=generated,
-                    segment_type="assimilate",
-                    termination="context_block",
-                )
-                trajectory.segments.append(segment)
-
-                # Phase-2 replacement: find the last tool output and replace with context content
-                last_invoke = next(
-                    (s for s in reversed(trajectory.segments) if s.segment_type == "invoke"),
-                    None,
-                )
-                if last_invoke and last_invoke.tool_output:
-                    replaced = replace_tool_output_with_context(
-                        context + "\n" + generated,
-                        last_invoke.tool_output,
-                        ctx_detection.content,
-                    )
-                    context = replaced
-                else:
-                    context = context + "\n" + generated
-                continue
-
-            # Synthesize segment — final reasoning / answer
+            # No code block — model finished (may or may not have <answer>)
             segment = Segment(
                 start_context=context,
                 generated_text=generated,
@@ -159,8 +136,7 @@ def run_single_rollout(model, tokenizer, question: str, dataset: str,
             trajectory.full_context = context + "\n" + generated
             break
 
-        # Code block found — this is an invoke segment
-        # Pre-resolve search calls if we have a search backend
+        # Code block found — execute and re-generate
         search_results = None
         if search_fn and search_enabled:
             queries = extract_search_query_strings(code_detection.executable)
@@ -181,12 +157,9 @@ def run_single_rollout(model, tokenizer, question: str, dataset: str,
             tool_output=stdout,
         )
         trajectory.segments.append(segment)
-
-        # Build next context: original question + replaced output so far
-        # This is the transient state s̃ with raw tool output
         context = question + "\n\n" + replaced
 
-        if seg_idx == MAX_SEGMENTS - 1:
+        if tool_call_idx == MAX_TOOL_CALLS - 1:
             segment.termination = "truncated"
             trajectory.full_context = context
     else:
