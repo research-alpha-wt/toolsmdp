@@ -257,8 +257,7 @@ def mode_pipeline(model, tokenizer):
                 print(f" | output: {seg.tool_output[:60]}", end="")
             print()
 
-        # Try scoring
-        reward = compute_reward(traj.full_context, None, dataset)
+        # Show final context (no scoring in pipeline mode — no gold answers)
         print(f"  Final context (last 200 chars): ...{traj.full_context[-200:]}")
 
 
