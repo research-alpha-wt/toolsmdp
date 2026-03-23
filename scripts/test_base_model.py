@@ -27,7 +27,7 @@ from core.reward import compute_reward, extract_answer
 from core.segment_rollout import Segment, Trajectory
 from sandbox.executor import execute_code, extract_search_query_strings
 
-MODEL_ID = "Qwen/Qwen3.5-4B"
+MODEL_ID = "Qwen/Qwen2.5-3B-Instruct"
 MAX_SEGMENTS = 15
 MAX_TOKENS_PER_SEGMENT = 1024
 MAX_ASSIMILATE_TOKENS = 256
@@ -87,7 +87,6 @@ def generate_segment(model, tokenizer, context: str, max_new_tokens: int = MAX_T
     ]
     input_text = tokenizer.apply_chat_template(
         messages, tokenize=False, add_generation_prompt=True,
-        enable_thinking=False,
     )
     inputs = tokenizer(input_text, return_tensors="pt").to(model.device)
 

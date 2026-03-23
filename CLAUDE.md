@@ -51,7 +51,7 @@ Resolved all current-milestone container TODOs and simplified code:
   - `code_gen`: Smoke test — does the model produce ```python blocks?
   - `pipeline`: Full SMDP segment loop (generate → detect → execute → replace → continue)
   - `eval`: Run on JSONL data, compute EM accuracy + difficulty bucket classification
-- **Model choice**: Qwen3.5-4B (`Qwen/Qwen3.5-4B`), ~10GB VRAM BF16, 256K context
+- **Model choice**: Qwen2.5-3B-Instruct (`Qwen/Qwen2.5-3B-Instruct`), ~6GB VRAM BF16, 128K context
 - **Auto dtype**: float16 on T4 (no native bfloat16), bfloat16 on A100/H200
 - **Compute plan**: Lightning.ai T4 (79h free) for Milestones 2-3, save A100/H200 for training
 
