@@ -1,0 +1,13 @@
+# AML code upload ignore list
+.git/
+.claude/
+.vscode/
+.devcontainer/
+__pycache__/
+*.pyc
+paper_draft/
+downloads/
+az/
+aml/
+*.egg-info/
+.env

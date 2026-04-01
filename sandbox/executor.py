@@ -1,3 +1,9 @@
+"""Sandboxed code execution. Runs code in a subprocess with a timeout.
+
+No import restrictions — the 5-second timeout is the safety boundary.
+If code produces no output or errors, returns a default error message.
+"""
+
 import json
 import re
 import subprocess
@@ -6,35 +12,7 @@ import textwrap
 import tempfile
 import os
 
-BLOCKED_PATTERNS = frozenset({
-    "import os", "import sys", "import subprocess", "import shutil",
-    "import socket", "import requests", "import urllib", "import importlib",
-    "import pathlib", "import io", "from os", "from sys",
-    "from subprocess", "from shutil", "from socket", "from requests",
-    "from urllib", "from importlib", "from pathlib", "from io",
-    "__import__", "exec(", "eval(", "compile(", "open(",
-    "breakpoint(", "globals(", "locals(",
-})
-
 TIMEOUT_SECONDS = 5
-
-_BLOCKED_MODULES = frozenset({
-    "os", "sys", "subprocess", "shutil", "socket",
-    "requests", "urllib", "importlib", "pathlib", "io",
-    "signal", "ctypes", "multiprocessing", "threading",
-})
-
-_IMPORT_GUARD = textwrap.dedent("""\
-    import builtins
-    _orig_import = builtins.__import__
-    _BLOCKED = {blocked}
-    def _safe_import(name, globals=None, locals=None, fromlist=(), level=0):
-        top = name.split('.')[0]
-        if level == 0 and top in _BLOCKED:
-            raise ImportError(f"Import '{{name}}' is not allowed")
-        return _orig_import(name, globals, locals, fromlist, level)
-    builtins.__import__ = _safe_import
-""")
 
 _SEARCH_PLACEHOLDER = textwrap.dedent("""\
     def search(query):
@@ -62,7 +40,7 @@ def extract_search_query_strings(code: str) -> list[str]:
     """Return deduplicated list of search query strings found in code."""
     queries = []
     for match in extract_search_queries(code):
-        q = match[0] or match[1]  # one of the two groups matched
+        q = match[0] or match[1]
         if q and q not in queries:
             queries.append(q)
     return queries
@@ -76,17 +54,13 @@ def execute_code(
 ) -> str:
     """Execute Python code in a sandboxed subprocess. Returns stdout or 'ERROR: ...'.
 
-    If search_results is provided, search() calls use pre-resolved results.
-    If search_enabled=True but no search_results, a placeholder is used.
+    No import restrictions. The 5-second timeout is the safety net.
+    If code errors or produces no output, returns a descriptive error.
     """
     if not code.strip():
         return ""
 
-    for pattern in BLOCKED_PATTERNS:
-        if pattern in code:
-            return f"ERROR: Blocked operation: {pattern}"
-
-    script = _IMPORT_GUARD.format(blocked=repr(_BLOCKED_MODULES))
+    script = ""
     if search_results:
         script += _build_search_func(search_results)
     elif search_enabled:
@@ -110,12 +84,13 @@ def execute_code(
             for line in reversed(result.stderr.strip().splitlines()):
                 if line and not line.startswith(" ") and not line.startswith("Traceback"):
                     return f"ERROR: {line}"
-            return "ERROR: Unknown error"
+            return "ERROR: Code execution failed"
 
-        return result.stdout.rstrip("\n")
+        output = result.stdout.rstrip("\n")
+        return output if output else "ERROR: Code produced no output"
 
     except subprocess.TimeoutExpired:
-        return "ERROR: Execution timed out"
+        return "ERROR: Execution timed out (5s limit)"
     except Exception as e:
         return f"ERROR: {type(e).__name__}: {e}"
     finally:

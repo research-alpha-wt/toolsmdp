@@ -66,6 +66,24 @@ def _extract_triviaqa_answer(ex: dict) -> list[str]:
     return [str(answer_obj)]
 
 
+def _format_finqa_question(ex):
+    """Build FinQA question with table context (pre_text + table + post_text + question)."""
+    parts = []
+    if ex.get("pre_text"):
+        parts.append("\n".join(ex["pre_text"]))
+    if ex.get("table"):
+        rows = []
+        for i, row in enumerate(ex["table"]):
+            rows.append("| " + " | ".join(str(c) for c in row) + " |")
+            if i == 0:
+                rows.append("|" + " --- |" * len(row))
+        parts.append("\n".join(rows))
+    if ex.get("post_text"):
+        parts.append("\n".join(ex["post_text"]))
+    parts.append(ex["qa"]["question"])
+    return "\n\n".join(parts)
+
+
 # ── Dataset configs ──
 
 _answer_field = lambda ex: ex["answer"]
@@ -93,7 +111,7 @@ DATASET_CONFIGS = {
         "splits": {"train": "train", "validation": "test"},
     },
     "musique": {
-        "hf_path": "drt/musique", "hf_name": None,
+        "hf_path": "bdsaglam/musique", "hf_name": None,
         "extract_fn": _answer_field, "question_key": "question",
         "splits": {"train": "train", "validation": "dev"},
     },
@@ -108,7 +126,7 @@ DATASET_CONFIGS = {
             "test": "https://raw.githubusercontent.com/czyssrs/FinQA/main/dataset/test.json",
         },
         "extract_fn": lambda ex: str(ex["qa"]["exe_ans"]),
-        "question_key": "qa.question",
+        "question_fn": _format_finqa_question,
         "splits": {"train": "train", "test": "test"},
     },
     "triviaqa": {
@@ -178,8 +196,12 @@ def process_dataset(name: str, config: dict, data_root: Path,
 
         for ex in tqdm(raw_data, desc=f"  {name}/{our_split}"):
             try:
+                if "question_fn" in config:
+                    question = config["question_fn"](ex)
+                else:
+                    question = _get_field(ex, config["question_key"])
                 examples.append({
-                    "question": _get_field(ex, config["question_key"]),
+                    "question": question,
                     "gold_answer": config["extract_fn"](ex),
                     "dataset": name,
                     "split": our_split,

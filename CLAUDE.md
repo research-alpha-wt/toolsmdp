@@ -102,6 +102,24 @@ Resolved all current-milestone container TODOs and simplified code:
 - **Tests**: 23 new detector tests, 5 new replacement tests.
 - **138 passed, 2 skipped**
 
+### Session 10 (2026-03-23): Step 2.1 — GPU Smoke Test + Simplification
+- **Model switch**: Qwen3.5-4B → **Qwen2.5-3B-Instruct** (Qwen3.5 too new for transformers 4.x, needs unreleased version that breaks vllm)
+- **Lightning.ai**: T4 interruptible, `scripts/lightning_setup.sh` for one-command setup
+- **System prompt rewritten**: (a) code blocks for computation/search only, (b) `<context>` only after tool output, (c) `<answer>` block for bare final answer
+- **`<answer>` tag extraction**: `reward.py` checks for `<answer>...</answer>` first, then falls back to dataset-specific patterns. 6 new tests.
+- **Rollout loop simplified**: No segment classification. Generate → check `<answer>` (done) or code block (execute, re-generate). `<context>` blocks stay as-is in text. Phase-2 replacement is a training-time concern (Milestone 4, token-by-token generation).
+- **`scripts/interactive.py`** (new): Interactive REPL with raw LLM output display
+- **Baseline results**: GSM8K 40% EM, HotpotQA 8% EM (50 samples each)
+- **pyproject.toml**: pinned `transformers>=4.51`, added `accelerate`
+- **144 passed, 2 skipped**
+
+### Session 11 (2026-03-24): Azure ML Setup
+- **AML workspace**: Jobs-only (no Compute Instances), AMD GPUs (ROCm)
+- **Custom environment built**: `toolsmdp-rocm` v1 — `rocm/pytorch:latest` base, Java 21, all Python deps, Wikipedia BM25 index baked in (~20GB+ image)
+- **No AML curated AMD images exist** — used `rocm/pytorch:latest` from Docker Hub directly
+- **Job workflow**: code mounted at runtime via `code:` field, `pip install -e .` at job start, deps cached in image
+- **Milestone coverage**: Milestones 2-3 fine on AMD (inference only). Milestone 5 (PPO training) risky on AMD — OpenRLHF has no official ROCm support, may need NVIDIA GPUs
+
 ## Key Decisions and Why
 
 ### Critic Architecture
@@ -187,6 +205,72 @@ pip install -e ".[train,dev]"
 pytest tests/ -v
 ```
 
+## Azure ML Setup
+
+**Workspace:** `bingdmml` (westus2). Singularity virtual cluster with MI300X AMD GPUs.
+
+**Environment:** `amd-inference:1` — custom Docker image in AML, for AMD GPU inference.
+
+**Compute:** Singularity virtual cluster (shared, not listed in `compute.list()`).
+- Virtual cluster path: `/subscriptions/07c3f5a2-.../virtualclusters/webxtstcabd`
+- Instance type: `Singularity.ND24is_MI300X_v5` (configured in `.env`)
+
+**Storage:** `bingdmml6443962715` blob storage.
+- Default datastore: `workspaceblobstore` (identity-based auth, no account key)
+- Data container: `data` (datastore: `datablobstore`)
+- Eval data uploaded to `data/eval-data-50/`
+
+### Singularity Job Requirements (hard-won lessons)
+
+These are **mandatory** for any Singularity job. Missing any one causes cryptic failures:
+
+1. **Premium SLA tier** — `queue_settings={"job_tier": "Premium"}`. Without it: "zero total quota" error.
+2. **UAI managed identity** — Singularity cannot use account key auth on blobstore. Must pass:
+   - `_AZUREML_SINGULARITY_JOB_UAI`: full ARM resource ID of the workspace UAI
+   - `DEFAULT_IDENTITY_CLIENT_ID`: UAI client ID
+   - The workspace UAI is `UAI_BingDMML` (client ID `37ec208a-d44d-4a10-bb4b-f567373cda57`)
+3. **Common runtime** — `AZUREML_COMPUTE_USE_COMMON_RUNTIME=true` env var.
+4. **No pip install** — the container venv is read-only (`/opt/venv/`). Use `PYTHONPATH=$PWD` instead.
+5. **No git metadata** — `submit_job.py` copies code to a temp dir and `os.chdir()` there before calling `create_or_update()`. Otherwise the SDK embeds git commit/repo/branch from the local `.git/` via mlflow auto-tracking. There is no env var to disable this.
+6. **Experiment names** — use generic names like `infer-milestone-2`, not project-specific names.
+
+### `aml-helper` package (standalone, outside toolsmdp)
+
+Generic AML/Singularity job toolkit at `../aml-helper/`. All Singularity plumbing (UAI, SLA tier, git stripping) is config-driven via `aml.yaml` in the project root.
+
+**Install:** `pip install -e ../aml-helper`
+
+**Config:** `aml.yaml` in project root (gitignored). See `../aml-helper/aml.example.yaml` for template.
+
+**Commands:**
+```bash
+# Upload data
+aml upload-data --name eval-data-50 --path data_local/eval_splits
+
+# Submit a job (--name required)
+aml submit --name inference-eval-50 --command "export PYTHONPATH=\$PWD:\$PYTHONPATH && python -m analysis.pre_training_characterization --input-dir data_local/eval_splits --output-dir ./outputs --num-rollouts 4 --datasets gsm8k hotpotqa"
+
+# Monitor
+aml status <job-name>
+aml logs <job-name>
+aml download <job-name> --output results --path ./downloads
+aml list
+
+# Cancel / archive
+aml cancel <job-name>
+aml archive <job-name>
+
+# Create environment from Dockerfile
+aml env-create --name my-env --dockerfile ./Dockerfile
+```
+
+**How code gets in:** `aml submit` copies the project to a temp dir (excluding `.git/` and patterns from `aml.yaml`), uploads it. Uses `PYTHONPATH=$PWD` instead of pip install (container venv is read-only).
+
+**Milestone coverage:**
+- Milestones 2-3 (inference + critic warmup): Works on AMD GPUs (forward passes only)
+- Milestone 4 (OpenRLHF integration): Add `openrlhf` to image, rebuild
+- Milestone 5 (PPO training): ROCm compatibility with OpenRLHF risky — may need NVIDIA GPUs
+
 See `SETUP.md` for conda environment setup and JAVA_HOME configuration.
 
 ## Codebase Conventions
@@ -199,3 +283,21 @@ See `SETUP.md` for conda environment setup and JAVA_HOME configuration.
 - Modular package structure: `core/`, `sandbox/`, `data/`, `retrieval/`, `tests/`
 - All paths via `$DATA_ROOT` and `$CHECKPOINT_ROOT` env vars (compute-agnostic)
 - Container-first: all deps managed via `pyproject.toml`, never `pip install` on bare metal
+
+## Experiment Results Management
+
+**Every experiment run must be documented.** After downloading results from a job:
+
+1. **Store results** in `downloads/<descriptive-name>/` with the job name recorded.
+2. **Update `results.md`** with the new numbers (tables, per-dataset, per-bucket).
+3. **Update `analysis/step_X_X_analysis.md`** with:
+   - Summary of what changed (sandbox fix, data format, etc.)
+   - Before/after comparison tables
+   - Concrete failure examples (question, gold, prediction, tool calls)
+   - Insights on why things improved or didn't
+4. **Track result lineage** — record which job, environment version, code changes, and data version produced each set of numbers.
+
+**Result files:**
+- `results.md` — living summary of all numbers, feeds into paper tables
+- `analysis/step_X_X_analysis.md` — detailed per-step analysis with examples and failure modes
+- `downloads/` — raw result artifacts organized by job name
